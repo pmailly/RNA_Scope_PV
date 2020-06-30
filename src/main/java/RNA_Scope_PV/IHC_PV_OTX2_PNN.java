@@ -12,6 +12,7 @@ import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.gui.WaitForUserDialog;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -63,8 +64,8 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
     // threshold to keep PV and Otx2 cells
     public static double PVMinInt, Otx2MinInt;
     public static double sphCell = 0.5;
-    public static double minCellVol = 500;
-    public static double maxCellVol = 20000;
+    public static double minCellVol = 600;
+    public static double maxCellVol = 8000;
     public static BufferedWriter PV_Analyze, Otx2_Analyze, PNN_Analyze;
 
     
@@ -214,28 +215,29 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             // PV background
                             System.out.println("PV");
                             double[] bgPV = find_background(imgPV);
-                            // find PV cells
-                            Objects3DPopulation PVPop = findCells(imgPV, 30, 40, 2, "Otsu");
+                            // find PV cells                          
+                            Objects3DPopulation PVPop = findCells(imgPV, 18, 20, 1, "MeanPlusStdDev", true);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects());
-                            // create donut
-                            float dilatedStepXY = (float) (6/cal.pixelWidth);
-                            float dilatedStepZ = (float) (6/cal.pixelDepth);
-                            Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
-
+                           
                             // Otx2
                             ImagePlus imgOtx2 = BF.openImagePlus(options)[0];
                             System.out.println("Otx2");
                             // Otx2 background
                             double[] bgOtx2 = find_background(imgOtx2);
                             // Find Otx2 cells
-                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, 15, 20, 4, "Triangle");
+                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, 18, 20, 1, "Huang", true);
                             System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects());
-                            Objects3DPopulation Otx2DonutPop  = createDonutPop(Otx2Pop, imgOtx2, dilatedStepXY, dilatedStepZ);
-
-                                                        
+                            
+                            // save image for objects population
+                            saveIHCObjects(PVPop, Otx2Pop, PNNPop, imgPV, outDirResults+rootName+"_"+seriesName+"_IHCObjects.tif");    
+                            
                             // Compute parameters
 
                             // PV
+                            // create donut
+                            float dilatedStepXY = (float) (6/cal.pixelWidth);
+                            float dilatedStepZ = (float) (6/cal.pixelDepth);
+                            Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
                             ImageHandler imhPV = ImageHandler.wrap(imgPV);
                             ImageHandler imhOtx2 = ImageHandler.wrap(imgOtx2);
                             ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
@@ -253,6 +255,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             }
 
                             // Otx2
+                            Objects3DPopulation Otx2DonutPop  = createDonutPop(Otx2Pop, imgOtx2, dilatedStepXY, dilatedStepZ);
                             for (int o = 0; o < Otx2Pop.getNbObjects(); o++) {
                                 Object3D obj = Otx2Pop.getObject(o);
                                 Object3D objDonut = Otx2DonutPop.getObject(o);
@@ -291,8 +294,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                         "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
                                 PNN_Analyze.flush();
                             }
-                            // save image for objects population
-                            saveIHCObjects(PVPop, Otx2Pop, PNNPop, imgPV, outDirResults+rootName+"_"+seriesName+"_IHCObjects.tif");
+                            
                             closeImages(imgPV);
                             closeImages(imgOtx2);
                             closeImages(imgPNN);

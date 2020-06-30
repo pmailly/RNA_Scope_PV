@@ -147,7 +147,7 @@ public class mRNA_PV implements PlugIn {
                         double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                 * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
                         double[] bgRNA = find_background(imgRNA);
-                        Objects3DPopulation RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle");
+                        Objects3DPopulation RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle", false);
                         System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                         ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                         for (int o = 0; o < RNAPop.getNbObjects(); o++) {
