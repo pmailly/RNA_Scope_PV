@@ -11,7 +11,6 @@ import ij.ImageStack;
 import ij.WindowManager;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
@@ -33,6 +32,7 @@ import mcib3d.geom.Point3D;
 import mcib3d.image3d.ImageHandler;
 import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
+import mpicbg.ij.integral.RemoveOutliers;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -61,7 +61,6 @@ public class RNAScope_Tools3D {
     /**
      * Ask for parameters
      * @param channels
-     * @param imageDir
      * @return 
      */
     
@@ -140,21 +139,36 @@ public class RNAScope_Tools3D {
     /**
      * Filters PV cells on sphericity
      */
-    public static void filtersPVcells(Objects3DPopulation popPV, double[] bg, ImagePlus img) {
-        ImageHandler ima = ImageHandler.wrap(img);
-        double bgPV = (bg[0] + bg[1])*2;
+    public static void sphericityFilterCells(Objects3DPopulation popPV) {
         for (int i = 0; i < popPV.getNbObjects(); i++) {
             Object3D obj = popPV.getObject(i);
             double sph = obj.getSphericity(true);
-            double intPV = obj.getPixMeanValue(ima);
-            if (sph < 0.5 || intPV <= bgPV){
+            if (sph < 0.6){
                 popPV.removeObject(i);
                 i--;
             }
         }
     }
   
-    
+    /**
+     * Remove Outliers
+     * 
+     * @param img
+     * @param radX
+     * @param radY
+     * @param factor
+     * @return img
+     */
+    public static ImagePlus removeOutliers(ImagePlus img, int radX, int radY, float factor) {
+        
+        for (int i = 0; i < img.getNSlices(); i++) {
+            img.setSlice(i);
+            ImageProcessor ip = img.getProcessor();
+            RemoveOutliers removeOut = new RemoveOutliers(ip.convertToFloatProcessor());
+            removeOut.removeOutliers(radX, radY, factor);
+        }
+        return(img);
+    }
     
     /**
      * Cells segmentation
@@ -164,11 +178,11 @@ public class RNAScope_Tools3D {
      * @param th
      * @return 
      */
-    public static Objects3DPopulation findCells(ImagePlus imgCells, int blur1, int blur2, int med, String th, boolean removeOutliers) {
+    public static Objects3DPopulation findCells(ImagePlus imgCells, int blur1, int blur2, int med, String th, int radX, int radY, boolean removeOutliers) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(cal);
         if (removeOutliers)
-            IJ.run(img, "Remove Outliers...", "radius=10 threshold=1 which=Bright stack");
+            removeOutliers(img, radX, radY, 1);
         IJ.run(img, "Median...", "radius="+med+" stack");
         ImageStack stack = new ImageStack(img.getWidth(), img.getHeight());
         for (int i = 1; i <= img.getStackSize(); i++) {

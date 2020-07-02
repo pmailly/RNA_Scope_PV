@@ -5,6 +5,7 @@ import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.find_background;
 import static Tools.RNAScope_Tools3D.saveRNAObjects;
+import static Tools.RNAScope_Tools3D.sphericityFilterCells;
 import ij.IJ;
 import ij.ImagePlus;
 import java.io.BufferedWriter;
@@ -147,7 +148,14 @@ public class mRNA_PV implements PlugIn {
                         double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                 * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
                         double[] bgRNA = find_background(imgRNA);
-                        Objects3DPopulation RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle", false);
+                        Objects3DPopulation RNAPop = new Objects3DPopulation();
+                        // detecte cell 
+                        if (seriesName.contains("Visuel"))
+                            RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle", 0, 0, false);
+                        else {
+                            RNAPop = findCells(imgRNA, 15, 16, 2, "Triangle", 2, 2, true);
+                            sphericityFilterCells(RNAPop);
+                        }
                         System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                         ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                         for (int o = 0; o < RNAPop.getNbObjects(); o++) {

@@ -12,7 +12,6 @@ import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.gui.WaitForUserDialog;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -216,7 +215,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             System.out.println("PV");
                             double[] bgPV = find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = findCells(imgPV, 18, 20, 1, "MeanPlusStdDev", true);
+                            Objects3DPopulation PVPop = findCells(imgPV, 18, 20, 1, "MeanPlusStdDev", 10, 10, true);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects());
                            
                             // Otx2
@@ -225,7 +224,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             // Otx2 background
                             double[] bgOtx2 = find_background(imgOtx2);
                             // Find Otx2 cells
-                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, 18, 20, 1, "Huang", true);
+                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, 18, 20, 1, "Huang", 10, 10, true);
                             System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects());
                             
                             // save image for objects population
