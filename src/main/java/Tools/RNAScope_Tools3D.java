@@ -4,6 +4,7 @@ package Tools;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.cal;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVol;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVol;
+import static RNA_Scope_PV.IHC_PV_OTX2_PNN.sphCell;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
@@ -143,32 +144,13 @@ public class RNAScope_Tools3D {
         for (int i = 0; i < popPV.getNbObjects(); i++) {
             Object3D obj = popPV.getObject(i);
             double sph = obj.getSphericity(true);
-            if (sph < 0.6){
+            if (sph < sphCell){
                 popPV.removeObject(i);
                 i--;
             }
         }
     }
   
-    /**
-     * Remove Outliers
-     * 
-     * @param img
-     * @param radX
-     * @param radY
-     * @param factor
-     * @return img
-     */
-    public static ImagePlus removeOutliers(ImagePlus img, int radX, int radY, float factor) {
-        
-        for (int i = 0; i < img.getNSlices(); i++) {
-            img.setSlice(i);
-            ImageProcessor ip = img.getProcessor();
-            RemoveOutliers removeOut = new RemoveOutliers(ip.convertToFloatProcessor());
-            removeOut.removeOutliers(radX, radY, factor);
-        }
-        return(img);
-    }
     
     /**
      * Cells segmentation
@@ -178,11 +160,9 @@ public class RNAScope_Tools3D {
      * @param th
      * @return 
      */
-    public static Objects3DPopulation findCells(ImagePlus imgCells, int blur1, int blur2, int med, String th, int radX, int radY, boolean removeOutliers) {
+    public static Objects3DPopulation findCells(ImagePlus imgCells, int blur1, int blur2, int med, String th) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(cal);
-        if (removeOutliers)
-            removeOutliers(img, radX, radY, 1);
         IJ.run(img, "Median...", "radius="+med+" stack");
         ImageStack stack = new ImageStack(img.getWidth(), img.getHeight());
         for (int i = 1; i <= img.getStackSize(); i++) {
