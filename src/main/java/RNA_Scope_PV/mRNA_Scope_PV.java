@@ -182,7 +182,7 @@ public class mRNA_Scope_PV implements PlugIn {
                            double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                    * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
                            double[] bgRNA = find_background(imgRNA);
-                           RNAPop = findCells(imgRNA, 8, 10, 1, "Li", 0, 0, false);
+                           RNAPop = findCells(imgRNA, 8, 10, 1, "Li");
                            System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                            ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                            for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -247,11 +247,11 @@ public class mRNA_Scope_PV implements PlugIn {
                                 float dilatedStepZ = (float) (6/cal.pixelDepth);
 
                                 // PV
-                                PVPop = findCells(imgPV, 8, 10, 1, "MeanPlusStdDev", 0, 0, false);
+                                PVPop = findCells(imgPV, 8, 10, 1, "MeanPlusStdDev");
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
                                 
                                 // filter again sphericity and intensity
-                                //filtersPVcells(PVPop, bgPV, imgPV);
+                                //filtersPVcells(PVPop);
                                 System.out.println("PV Cells found after filter: " + PVPop.getNbObjects());
                                 
                                 PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
@@ -271,7 +271,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                     PV_Analyze.flush();
                                 }
                                 // Tomato
-                                TomatoPop = findCells(imgTomato, 8, 10, 1, "Yen", 0, 0, false);
+                                TomatoPop = findCells(imgTomato, 8, 10, 1, "Yen");
                                 System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects());
                                 TomatoDonutPop  = createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                                 for (int o = 0; o < TomatoPop.getNbObjects(); o++) {

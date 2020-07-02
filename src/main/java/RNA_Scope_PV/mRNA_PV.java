@@ -150,12 +150,10 @@ public class mRNA_PV implements PlugIn {
                         double[] bgRNA = find_background(imgRNA);
                         Objects3DPopulation RNAPop = new Objects3DPopulation();
                         // detecte cell 
-                        if (seriesName.contains("Visuel"))
-                            RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle", 0, 0, false);
-                        else {
-                            RNAPop = findCells(imgRNA, 15, 16, 2, "Triangle", 2, 2, true);
+                        RNAPop = findCells(imgRNA, 9, 10, 2, "Triangle");
+                        if (!seriesName.contains("Visuel"))
                             sphericityFilterCells(RNAPop);
-                        }
+
                         System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                         ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                         for (int o = 0; o < RNAPop.getNbObjects(); o++) {
