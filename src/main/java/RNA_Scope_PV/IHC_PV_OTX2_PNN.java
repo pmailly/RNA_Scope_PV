@@ -12,6 +12,8 @@ import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -30,7 +32,9 @@ import loci.formats.services.OMEXMLService;
 import loci.plugins.BF;
 import loci.plugins.util.ImageProcessorReader;
 import ij.measure.Calibration;
+import ij.plugin.Duplicator;
 import ij.plugin.PlugIn;
+import ij.plugin.frame.RoiManager;
 import java.util.ArrayList;
 import javax.xml.parsers.ParserConfigurationException;
 import loci.plugins.in.ImporterOptions;
@@ -78,7 +82,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                 FileWriter fwPV = new FileWriter(outDirResults + "PV_results.xls",false);
                 PV_Analyze = new BufferedWriter(fwPV);
                 // write results headers
-                PV_Analyze.write("Image Name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPV Mean Intensity\tPV Integrated intensity\tPV Mean background Int\t"
+                PV_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPV Mean Intensity\tPV Integrated intensity\tPV Mean background Int\t"
                         + "Std backgroun Int\tPV Corrected Integrated intensity\tOtx2 Corrected Integrated intensity\tPNN Corrected Integrated intensity\n");
                 PV_Analyze.flush();
 
@@ -86,7 +90,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                 FileWriter fwOtx2 = new FileWriter(outDirResults + "Otx2_results.xls",false);
                 Otx2_Analyze = new BufferedWriter(fwOtx2);
                 // write results headers
-                Otx2_Analyze.write("Image Name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tOtx2 Integrated intensity\tOtx2 Mean background Int\t"
+                Otx2_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tOtx2 Integrated intensity\tOtx2 Mean background Int\t"
                         + "Std background Int\tOtx2 Corrected Integrated intensity\tPV Corrected Integrated intensity\tPNN Corrected Integrated intensity\n");
                 Otx2_Analyze.flush();
 
@@ -94,7 +98,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                 FileWriter fwPNN = new FileWriter(outDirResults + "PNN_results.xls",false);
                 PNN_Analyze = new BufferedWriter(fwPNN);
                 // write results headers
-                PNN_Analyze.write("Image Name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPNN Integrated intensity\tPNN Mean background Int\t"
+                PNN_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPNN Integrated intensity\tPNN Mean background Int\t"
                         + "Std background Int\tPNN Corrected Integrated intensity\t#PV Cell\tPV Corrected Integrated intensity\t#Otx2 Cell\tOtx2 Corrected Integrated intensity\n");
                 PNN_Analyze.flush();
     }
@@ -132,7 +136,6 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
             reader.setMetadataStore(meta);
             Arrays.sort(imageFile);
             int imageNum = 0;
-            String seriesName = "";
             ArrayList<String> channels = new ArrayList();
             for (String f : imageFile) {
                 // Find nd files
@@ -150,7 +153,6 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                         for (int n = 0; n < chs; n++)
                             ch[n] = meta.getChannelName(0, n);
                     }
-                    
                     if (imageNum == 1) {   
                         // read image calibration
                         cal.pixelWidth = meta.getPixelsPhysicalSizeX(0).value().doubleValue();
@@ -188,125 +190,147 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
 
                        // Find xml points file
                         String xmlFile = inDir+ File.separator + rootName + ".xml";
-                        if (!new File(xmlFile).exists()) {
-                            IJ.showStatus("No XML file found !") ;
+                        String roiFile = inDir+ File.separator + rootName + ".zip";
+                        if (!new File(xmlFile).exists() || !new File(roiFile).exists()) {
+                            IJ.showStatus("No XML or roi file found !") ;
                         }
                         else {
-                            options.setSeriesOn(0, true);
                             options.setCBegin(0, 0);
                             options.setCEnd(0, 2);
                             
+                            // Roi
+                            RoiManager rm = new RoiManager(false);
+                            rm.runCommand("Open", roiFile);
+                            Roi[] rois = rm.getRoisAsArray();
                             // PNN
-                            ImagePlus imgPNN = BF.openImagePlus(options)[1];
-                            // PNN background
-                            System.out.println("PNN");
-                            double[] bgPNN = find_background(imgPNN);
-                            // Find PNN cells with xml points file
-                            ArrayList<Point3D> PNNPoints = readXML(xmlFile);
-                            Objects3DPopulation PNNPop = findPNNCells(imgPNN, PNNPoints);
-                            System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
-                            
+                            System.out.println("Opening PNN channel ...");
+                            ImagePlus imgPNNOrg = BF.openImagePlus(options)[1];
+                            //PV
+                            System.out.println("Opening PV channel ...");
+                            ImagePlus imgPVOrg = BF.openImagePlus(options)[2];
+                            //Otx2
+                            System.out.println("Opening Otx2 channel ...");
+                            ImagePlus imgOtx2Org = BF.openImagePlus(options)[0];
+                            // for all rois
+                            for (Roi roi : rois) {
+                                imgPNNOrg.setRoi(roi);
+                                String roiName = roi.getName();
+                                ImagePlus imgPNN = new Duplicator().run(imgPNNOrg);
+                                // PNN background
+                                System.out.println("PNN");
+                                double[] bgPNN = find_background(imgPNN);
+                                // Find PNN cells with xml points file
+                                ArrayList<Point3D> PNNPoints = readXML(xmlFile);
+                                Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
+                                System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
 
-                            // PV
-                            ImagePlus imgPV = BF.openImagePlus(options)[2];
-                            //section volume in mm^3
-                            double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
-                            // PV background
-                            System.out.println("PV");
-                            double[] bgPV = find_background(imgPV);
-                            // find PV cells                          
-                            Objects3DPopulation PVPop = findCells(imgPV, 18, 20, 1, "MeanPlusStdDev");
-                            System.out.println("PV Cells found : " + PVPop.getNbObjects());
-                           
-                            // Otx2
-                            ImagePlus imgOtx2 = BF.openImagePlus(options)[0];
-                            System.out.println("Otx2");
-                            // Otx2 background
-                            double[] bgOtx2 = find_background(imgOtx2);
-                            // Find Otx2 cells
-                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, 18, 20, 1, "Huang");
-                            System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects());
-                            
-                            // save image for objects population
-                            saveIHCObjects(PVPop, Otx2Pop, PNNPop, imgPV, outDirResults+rootName+"_"+seriesName+"_IHCObjects.tif");    
-                            
-                            // Compute parameters
 
-                            // PV
-                            // create donut
-                            float dilatedStepXY = (float) (6/cal.pixelWidth);
-                            float dilatedStepZ = (float) (6/cal.pixelDepth);
-                            Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
-                            ImageHandler imhPV = ImageHandler.wrap(imgPV);
-                            ImageHandler imhOtx2 = ImageHandler.wrap(imgOtx2);
-                            ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
-                            for (int o = 0; o < PVPop.getNbObjects(); o++) {
-                                Object3D obj = PVPop.getObject(o);
-                                Object3D objDonut = PVDonutPop.getObject(o);
-                                double objVol = obj.getVolumeUnit();
-                                double objIntPV = obj.getIntegratedDensity(imhPV);
-                                double objMeanPV = obj.getPixMeanValue(imhPV);
-                                double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
-                                double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
-                                PV_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * objVol))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
-                                PV_Analyze.flush();
-                            }
+                                // PV
+                                imgPVOrg.setRoi(roi);
+                                ImagePlus imgPV = new Duplicator().run(imgPVOrg);
+                                //section volume in mm^3
+                                double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
+                                // PV background
+                                System.out.println("PV");
+                                double[] bgPV = find_background(imgPV);
+                                // find PV cells                          
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true);
+                                System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
-                            // Otx2
-                            Objects3DPopulation Otx2DonutPop  = createDonutPop(Otx2Pop, imgOtx2, dilatedStepXY, dilatedStepZ);
-                            for (int o = 0; o < Otx2Pop.getNbObjects(); o++) {
-                                Object3D obj = Otx2Pop.getObject(o);
-                                Object3D objDonut = Otx2DonutPop.getObject(o);
-                                double objVol = obj.getVolumeUnit();
-                                double objIntPV = obj.getIntegratedDensity(imhPV);
-                                double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
-                                double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
-                                Otx2_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+Otx2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntOtx2+"\t"+
-                                        bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+(objIntPV - (bgPV[0] * objVol))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
-                                Otx2_Analyze.flush();
-                            }
+                                // Otx2
+                                imgOtx2Org.setRoi(roi);
+                                ImagePlus imgOtx2 = new Duplicator().run(imgOtx2Org);
+                                System.out.println("Otx2");
+                                // Otx2 background
+                                double[] bgOtx2 = find_background(imgOtx2);
+                                // Find Otx2 cells
+                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true);
+                                System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects());
 
-                            // PNN
-                            for (int o = 0; o < PNNPop.getNbObjects(); o++) {
-                                Object3D obj = PNNPop.getObject(o);
-                                double objVol = obj.getVolumeUnit();
-                                double objIntPNN = obj.getIntegratedDensity(imhPNN);
-                                // find associated pv cell
-                                Object3D pvCell = findAssociatedCell(PVPop, obj);
-                                // find associated Otx2 cell
-                                Object3D Otx2Cell = findAssociatedCell(Otx2Pop, obj);
-                                double objIntPV = 0;
-                                double objIntOtx2 = 0;
-                                int pvIndex = -1;
-                                int Otx2Index = -1;
-                                if (pvCell != null) {
-                                    objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
-                                    pvIndex = PVPop.getIndexOf(pvCell);
-                                }    
-                                if (Otx2Cell != null) {
-                                    objIntOtx2 = Otx2Cell.getIntegratedDensity(imhOtx2) - bgOtx2[0] * (Otx2Cell.getVolumeUnit());
-                                    Otx2Index = Otx2Pop.getIndexOf(Otx2Cell);
+                                // save image for objects population
+                                saveIHCObjects(PVPop, Otx2Pop, PNNPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");    
+
+                                // Compute parameters
+
+                                // PV
+                                // create donut
+                                float dilatedStepXY = (float) (6/cal.pixelWidth);
+                                float dilatedStepZ = (float) (6/cal.pixelDepth);
+                                Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
+                                ImageHandler imhPV = ImageHandler.wrap(imgPV);
+                                ImageHandler imhOtx2 = ImageHandler.wrap(imgOtx2);
+                                ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
+                                for (int o = 0; o < PVPop.getNbObjects(); o++) {
+                                    Object3D obj = PVPop.getObject(o);
+                                    Object3D objDonut = PVDonutPop.getObject(o);
+                                    double objVol = obj.getVolumeUnit();
+                                    double objIntPV = obj.getIntegratedDensity(imhPV);
+                                    double objMeanPV = obj.getPixMeanValue(imhPV);
+                                    double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
+                                    double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
+                                    PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
+                                            bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * objVol))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                    PV_Analyze.flush();
                                 }
-                                PNN_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                        bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * objVol)+"\t"+pvIndex+"\t"+objIntPV+
-                                        "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
-                                PNN_Analyze.flush();
+
+                                // Otx2
+                                Objects3DPopulation Otx2DonutPop  = createDonutPop(Otx2Pop, imgOtx2, dilatedStepXY, dilatedStepZ);
+                                for (int o = 0; o < Otx2Pop.getNbObjects(); o++) {
+                                    Object3D obj = Otx2Pop.getObject(o);
+                                    Object3D objDonut = Otx2DonutPop.getObject(o);
+                                    double objVol = obj.getVolumeUnit();
+                                    double objIntPV = obj.getIntegratedDensity(imhPV);
+                                    double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
+                                    double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
+                                    Otx2_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+Otx2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntOtx2+"\t"+
+                                            bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+(objIntPV - (bgPV[0] * objVol))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                    Otx2_Analyze.flush();
+                                }
+
+                                // PNN
+                                for (int o = 0; o < PNNPop.getNbObjects(); o++) {
+                                    Object3D obj = PNNPop.getObject(o);
+                                    double objVol = obj.getVolumeUnit();
+                                    double objIntPNN = obj.getIntegratedDensity(imhPNN);
+                                    // find associated pv cell
+                                    Object3D pvCell = findAssociatedCell(PVPop, obj);
+                                    // find associated Otx2 cell
+                                    Object3D Otx2Cell = findAssociatedCell(Otx2Pop, obj);
+                                    double objIntPV = 0;
+                                    double objIntOtx2 = 0;
+                                    int pvIndex = -1;
+                                    int Otx2Index = -1;
+                                    if (pvCell != null) {
+                                        objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                                        pvIndex = PVPop.getIndexOf(pvCell);
+                                    }    
+                                    if (Otx2Cell != null) {
+                                        objIntOtx2 = Otx2Cell.getIntegratedDensity(imhOtx2) - bgOtx2[0] * (Otx2Cell.getVolumeUnit());
+                                        Otx2Index = Otx2Pop.getIndexOf(Otx2Cell);
+                                    }
+                                    PNN_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
+                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * objVol)+"\t"+pvIndex+"\t"+objIntPV+
+                                            "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
+                                    PNN_Analyze.flush();
+                                }
+                                closeImages(imgPNN);
+                                closeImages(imgOtx2);
+                                closeImages(imgPV);
+                                
                             }
-                            
-                            closeImages(imgPV);
-                            closeImages(imgOtx2);
-                            closeImages(imgPNN);
+                            closeImages(imgPVOrg);
+                            closeImages(imgOtx2Org);
+                            closeImages(imgPNNOrg);
                         }
                     }
                 }
-            PV_Analyze.close();
-            Otx2_Analyze.close();
-            PNN_Analyze.close();
+                PV_Analyze.close();
+                Otx2_Analyze.close();
+                PNN_Analyze.close();
             
-        } catch (IOException | DependencyException | ServiceException | FormatException | ParserConfigurationException | SAXException ex) {
-            Logger.getLogger(IHC_PV_OTX2_PNN.class.getName()).log(Level.SEVERE, null, ex);
-        }
+            } catch (IOException | DependencyException | ServiceException | FormatException | ParserConfigurationException | SAXException ex) {
+                Logger.getLogger(IHC_PV_OTX2_PNN.class.getName()).log(Level.SEVERE, null, ex);
+            }
         IJ.showStatus("Process done ...");
     }
 }

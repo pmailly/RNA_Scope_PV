@@ -4,25 +4,28 @@ package Tools;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.cal;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVol;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVol;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.sphCell;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.Prefs;
 import ij.WindowManager;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
 import ij.plugin.filter.RankFilters;
+import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import java.awt.Font;
 import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -33,7 +36,6 @@ import mcib3d.geom.Point3D;
 import mcib3d.image3d.ImageHandler;
 import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
-import mpicbg.ij.integral.RemoveOutliers;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -62,6 +64,7 @@ public class RNAScope_Tools3D {
     /**
      * Ask for parameters
      * @param channels
+     * @param imageDir
      * @return 
      */
     
@@ -138,19 +141,20 @@ public class RNAScope_Tools3D {
             
             
     /**
-     * Filters PV cells on sphericity
+     * Filters cells on sphericity
      */
-    public static void sphericityFilterCells(Objects3DPopulation popPV) {
+    public static void filterCells(Objects3DPopulation popPV) {
         for (int i = 0; i < popPV.getNbObjects(); i++) {
             Object3D obj = popPV.getObject(i);
             double sph = obj.getSphericity(true);
-            if (sph < sphCell){
+            if (sph < 0.35){
                 popPV.removeObject(i);
                 i--;
             }
         }
     }
   
+    
     
     /**
      * Cells segmentation
@@ -160,15 +164,17 @@ public class RNAScope_Tools3D {
      * @param th
      * @return 
      */
-    public static Objects3DPopulation findCells(ImagePlus imgCells, int blur1, int blur2, int med, String th) {
+    public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(cal);
-        IJ.run(img, "Median...", "radius="+med+" stack");
+        if (removeOutliers)
+            IJ.run(img, "Remove Outliers...", "radius=10 threshold=1 which=Bright stack");
+        median_filter(img, med);
         ImageStack stack = new ImageStack(img.getWidth(), img.getHeight());
         for (int i = 1; i <= img.getStackSize(); i++) {
             img.setZ(i);
             img.updateAndDraw();
-            IJ.run(img, "Nuclei Outline", "blur="+blur1+" blur2="+blur2+" threshold_method="+th+" outlier_radius=15 outlier_threshold=1 max_nucleus_size=200 "
+            IJ.run(img, "Nuclei Outline", "blur="+blur1+" blur2="+blur2+" threshold_method="+th+" outlier_radius=15 outlier_threshold=1 max_nucleus_size=400 "
                     + "min_nucleus_size=80 erosion=5 expansion_inner=5 expansion=5 results_overlay");
             img.setZ(1);
             img.updateAndDraw();
@@ -183,7 +189,13 @@ public class RNAScope_Tools3D {
         }
         ImagePlus imgStack = new ImagePlus("Nucleus", stack);
         imgStack.setCalibration(cal);
-        
+        if (roi != null) {
+            roi.setLocation(0, 0);
+            imgStack.setRoi(roi);
+            IJ.run("Colors...", "foreground=white background=black selection=yellow");
+            IJ.run(imgStack, "Clear Outside","stack");
+            imgStack.deleteRoi();
+        }
         Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(imgStack).getObjectsWithinVolume​(minCellVol, maxCellVol, true));
         cellPop.removeObjectsTouchingBorders(imgStack, false);
         closeImages(imgStack);
@@ -191,13 +203,46 @@ public class RNAScope_Tools3D {
         return(cellPop);
     }
    
- 
+ /**
+     * Cells segmentation2
+     * @param imgCells
+     * @param blur1
+     * @param blur2
+     * @param th
+     * @return 
+     */
+    public static Objects3DPopulation findCellsPiriform(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th) {
+        ImagePlus img = new Duplicator().run(imgCells);
+        img.setCalibration(cal);
+        median_filter(img, med);
+        IJ.run(img, "Difference of Gaussians", "  sigma1=12 sigma2=10 stack");
+        img.setSlice(img.getNSlices()/2);
+        IJ.setAutoThreshold(img, th + " dark");
+        Prefs.blackBackground = false;
+        IJ.run(img, "Convert to Mask","method="+th+" background=Dark");
+        if (roi != null) {
+            roi.setLocation(0, 0);
+            img.setRoi(roi);
+            IJ.run("Colors...", "foreground=black background=white selection=yellow");
+            IJ.run(img, "Clear Outside","stack");
+            img.deleteRoi();
+            for (int n = 0; n < 3; n++) {
+                img.getProcessor().erode();
+                img.getProcessor().dilate();
+            }
+        }
+
+        Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(img).getObjectsWithinVolume​(minCellVol, maxCellVol, true));
+        cellPop.removeObjectsTouchingBorders(img, false);
+        closeImages(img);
+        return(cellPop);
+    }
     
     /**
      * Crop  cell arround center position
      * Keep 6 microns arround cell center
     */
-    private static ImagePlus cropCell(ImagePlus img, Point3D pt) {
+    private static ImagePlus cropCell(ImagePlus img, Point3D pt, double roiX, double roiY) {
         int crop = Math.round(3.00f/(float)cal.pixelDepth);
         int stackSize = img.getNSlices();
         int ptZ = pt.getRoundZ();
@@ -224,18 +269,17 @@ public class RNAScope_Tools3D {
             }
         }
         
-        //System.out.println("Crop="+crop+" Stack size ="+stackSize+" Zstart="+Zstart+" start="+start+" Zstop="+Zstop+" pt="+ptZ+" new Pt="+newPtZ);
         // crop
-        Rectangle box = new Rectangle(pt.getRoundX() - 100, pt.getRoundY() - 100, 200, 200);
+        Roi box = new Roi(pt.getRoundX() - roiX - 100, pt.getRoundY() - roiY - 100, 200, 200);
         img.setSlice(start + 1);
         img.setRoi(box);
         ImagePlus imgCrop = new Duplicator().run(img, Zstart, Zstop);
         imgCrop.setCalibration(img.getCalibration());
-        imgCrop.setTitle("cell");
-        IJ.run(imgCrop, "Difference of Gaussians", "sigma1=5 sigma2=2 stack");
-        Roi roi = new PointRoi(100, 100);
+        IJ.run(imgCrop, "Laplacian of Gaussian", "sigma=5 scale_normalised negate stack");
+        Roi ptRoi = new PointRoi(100, 100);
         imgCrop.setSlice(start + 1);
-        imgCrop.setRoi(roi);
+        imgCrop.setRoi(ptRoi);
+        imgCrop.setTitle("cell");
         img.deleteRoi();
         return(imgCrop);
     }
@@ -245,22 +289,28 @@ public class RNAScope_Tools3D {
      * PNN Cells segmentation
      * find PNN objects inside box 200X200 centrered to point
      * @param imgCells
+     * @param roi
+     * @param pts
      * @return 
      */
-    public static Objects3DPopulation findPNNCells(ImagePlus imgCells, ArrayList<Point3D> pts) {        
+    public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
         
         Objects3DPopulation cellPop = new Objects3DPopulation();
+        double roiX = roi.getXBase();
+        double roiY = roi.getYBase();
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
-            ImagePlus imgTmp = cropCell(imgCells, pt);
-            IJ.run(imgTmp, "Cell Outliner", "cell_radius=50 tolerance=0.8 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=10 all_slices");
-            ImagePlus cellOutline = WindowManager.getImage("cell Cell Outline");
-            cellOutline.hide();
-            closeImages(imgTmp);
-            Object3D obj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
-            obj.setNewCenter(pt.getRoundX(), pt.getRoundY(), pt.getRoundZ()-1);
-            cellPop.addObject(obj);
-            closeImages(cellOutline);
+            if(roi.contains(pt.getRoundX() - (int)roiX, pt.getRoundY() - (int)roiY)) {
+                ImagePlus imgTmp = cropCell(imgCells, pt, roiX, roiY);
+                IJ.run(imgTmp, "Cell Outliner", "cell_radius=50 tolerance=0.6 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=5 all_slices");
+                ImagePlus cellOutline = WindowManager.getImage("cell Cell Outline");
+                cellOutline.hide();
+                closeImages(imgTmp);
+                Object3D obj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
+                obj.setNewCenter(pt.getRoundX(), pt.getRoundY(), pt.getRoundZ()-1);
+                cellPop.addObject(obj);
+                closeImages(cellOutline);
+            }
         }
         return(cellPop);
     }
@@ -373,6 +423,21 @@ public class RNAScope_Tools3D {
         imgBin.closeImagePlus();
         return(donutPop);
     }
+    
+    /**
+     * find rois with name = serieName
+     */
+    public static ArrayList<Roi> findRoi(RoiManager rm, String seriesName) {
+        ArrayList<Roi> roi = new ArrayList();
+        for (int i = 0; i < rm.getCount(); i++) {
+            rm.select(i);
+            String name = rm.getName(i);
+            if (name.contains(seriesName))
+                roi.add(rm.getRoi(i));
+        }
+        return(roi);
+    }
+    
     
     /**
      * Label object

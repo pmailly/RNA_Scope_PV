@@ -84,7 +84,7 @@ public class mRNA_Scope_PV implements PlugIn {
                 return;
             }
             // create output folder
-            outDirResults = inDir + File.separator+ "Results"+ File.separator;
+            outDirResults = inDir + File.separator+ "Out"+ File.separator;
             File outDir = new File(outDirResults);
             if (!Files.exists(Paths.get(outDirResults))) {
                 outDir.mkdir();
@@ -182,7 +182,7 @@ public class mRNA_Scope_PV implements PlugIn {
                            double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                    * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
                            double[] bgRNA = find_background(imgRNA);
-                           RNAPop = findCells(imgRNA, 8, 10, 1, "Li");
+                           RNAPop = findCells(imgRNA, null, 8, 10, 1, "Li", false);
                            System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                            ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                            for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -247,11 +247,11 @@ public class mRNA_Scope_PV implements PlugIn {
                                 float dilatedStepZ = (float) (6/cal.pixelDepth);
 
                                 // PV
-                                PVPop = findCells(imgPV, 8, 10, 1, "MeanPlusStdDev");
+                                PVPop = findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
                                 
                                 // filter again sphericity and intensity
-                                //filtersPVcells(PVPop);
+                                //filtersPVcells(PVPop, bgPV, imgPV);
                                 System.out.println("PV Cells found after filter: " + PVPop.getNbObjects());
                                 
                                 PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
@@ -271,7 +271,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                     PV_Analyze.flush();
                                 }
                                 // Tomato
-                                TomatoPop = findCells(imgTomato, 8, 10, 1, "Yen");
+                                TomatoPop = findCells(imgTomato, null, 8, 10, 1, "Yen", false);
                                 System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects());
                                 TomatoDonutPop  = createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                                 for (int o = 0; o < TomatoPop.getNbObjects(); o++) {
@@ -287,7 +287,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                 }
                                 // Find PNN cells with xml points file
                                 ArrayList<Point3D> PNNPoints = readXML(xmlFile);
-                                PNNPop = findPNNCells(imgPNN, PNNPoints);
+                                PNNPop = findPNNCells(imgPNN, null, PNNPoints);
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
                                 for (int o = 0; o < PNNPop.getNbObjects(); o++) {
                                     Object3D obj = PNNPop.getObject(o);
