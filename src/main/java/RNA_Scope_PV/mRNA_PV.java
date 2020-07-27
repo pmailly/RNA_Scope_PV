@@ -174,10 +174,10 @@ public class mRNA_PV implements PlugIn {
                                 double[] bgRNA = find_background(imgRNACrop);
                                 Objects3DPopulation RNAPop = new Objects3DPopulation();
                                 if (seriesName.contains("Visuel"))
-                                    RNAPop = findCells(imgRNACrop, roi, 9, 10, 2, "Triangle", false);
+                                    RNAPop = findCells(imgRNACrop, roi, 9, 10, 2, "Triangle", false, minCellVol, maxCellVol);
                                 else
                                     RNAPop = findCellsPiriform(imgRNACrop, roi, 10, 12, 1.5, "RenyiEntropy");
-                                filterCells(RNAPop);
+                                filterCells(RNAPop, 0.45);
                                 System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                                 ImageHandler imhRNA = ImageHandler.wrap(imgRNACrop);
                                 for (int o = 0; o < RNAPop.getNbObjects(); o++) {

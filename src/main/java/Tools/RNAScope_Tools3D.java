@@ -2,8 +2,8 @@ package Tools;
 
 
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.cal;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVol;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVol;
+import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVolPV;
+import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVolPV;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
@@ -12,7 +12,6 @@ import ij.Prefs;
 import ij.WindowManager;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
@@ -21,11 +20,9 @@ import ij.plugin.filter.RankFilters;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import java.awt.Font;
-import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -143,11 +140,11 @@ public class RNAScope_Tools3D {
     /**
      * Filters cells on sphericity
      */
-    public static void filterCells(Objects3DPopulation popPV) {
+    public static void filterCells(Objects3DPopulation popPV, double sphCoef) {
         for (int i = 0; i < popPV.getNbObjects(); i++) {
             Object3D obj = popPV.getObject(i);
             double sph = obj.getSphericity(true);
-            if (sph < 0.35){
+            if (sph < sphCoef){
                 popPV.removeObject(i);
                 i--;
             }
@@ -164,7 +161,7 @@ public class RNAScope_Tools3D {
      * @param th
      * @return 
      */
-    public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers) {
+    public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, double minCellVol, double maxCellVol) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(cal);
         if (removeOutliers)
@@ -232,7 +229,7 @@ public class RNAScope_Tools3D {
             }
         }
 
-        Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(img).getObjectsWithinVolume​(minCellVol, maxCellVol, true));
+        Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(img).getObjectsWithinVolume​(minCellVolPV, maxCellVolPV, true));
         cellPop.removeObjectsTouchingBorders(img, false);
         closeImages(img);
         return(cellPop);
@@ -351,6 +348,7 @@ public class RNAScope_Tools3D {
         }
         if (Otx2Pop != null)
             Otx2Pop.draw(Otx2ImgObj, 64);
+            labelsObject(Otx2Pop, Otx2ImgObj.getImagePlus());
         if (PNNPop != null) {
             PNNPop.draw(pnnImgObj, 64);
             labelsObject(PNNPop, pnnImgObj.getImagePlus());

@@ -4,6 +4,7 @@ package RNA_Scope_PV;
 import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.createDonutPop;
 import static Tools.RNAScope_Tools3D.dialog;
+import static Tools.RNAScope_Tools3D.filterCells;
 import static Tools.RNAScope_Tools3D.findAssociatedCell;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findPNNCells;
@@ -67,8 +68,10 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
     // threshold to keep PV and Otx2 cells
     public static double PVMinInt, Otx2MinInt;
     public static double sphCell = 0.5;
-    public static double minCellVol = 600;
-    public static double maxCellVol = 8000;
+    public static double minCellVolOtx2 = 600;
+    public static double maxCellVolOtx2 = 4000;
+    public static double minCellVolPV = 600;
+    public static double maxCellVolPV = 8000;
     public static BufferedWriter PV_Analyze, Otx2_Analyze, PNN_Analyze;
 
     
@@ -234,7 +237,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 System.out.println("PV");
                                 double[] bgPV = find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true);
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVolPV, maxCellVolPV);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                                 // Otx2
@@ -244,7 +247,8 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 // Otx2 background
                                 double[] bgOtx2 = find_background(imgOtx2);
                                 // Find Otx2 cells
-                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true);
+                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, minCellVolOtx2, maxCellVolOtx2);
+                                filterCells(Otx2Pop, 0.55);
                                 System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects());
 
                                 // save image for objects population
