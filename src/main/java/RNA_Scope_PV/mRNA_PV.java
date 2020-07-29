@@ -160,26 +160,24 @@ public class mRNA_PV implements PlugIn {
                             //Detect RNA PV cells and measure intensity
 
                             System.out.println("-- Opening RNA channel " + seriesName);
-                            ImagePlus imgRNAOrg = BF.openImagePlus(options)[0];
+                            ImagePlus imgRNA = BF.openImagePlus(options)[0];
                             // Add roi if name contain seriesName crop image
                             ArrayList<Roi> rois = findRoi(rm, seriesName);
                             for (Roi roi : rois) {
-                                imgRNAOrg.setRoi(roi);
-                                ImagePlus imgRNACrop = new Duplicator().run(imgRNAOrg);
                                 String roiName = roi.getName();
                                 String layerName = roiName.replace(seriesName, "");
                                 // section volume in mm^3
-                                double sectionVol = (imgRNACrop.getWidth() * cal.pixelWidth * imgRNACrop.getHeight() * cal.pixelHeight
-                                        * imgRNACrop.getNSlices() * cal.pixelDepth) / 1e9;
-                                double[] bgRNA = find_background(imgRNACrop);
+                                double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
+                                        * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
+                                double[] bgRNA = find_background(imgRNA, roi);
                                 Objects3DPopulation RNAPop = new Objects3DPopulation();
                                 if (seriesName.contains("Visuel"))
-                                    RNAPop = findCells(imgRNACrop, roi, 9, 10, 2, "Triangle", false, minCellVol, maxCellVol);
+                                    RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, minCellVol, maxCellVol);
                                 else
-                                    RNAPop = findCellsPiriform(imgRNACrop, roi, 10, 12, 1.5, "RenyiEntropy");
+                                    RNAPop = findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
                                 filterCells(RNAPop, 0.45);
                                 System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
-                                ImageHandler imhRNA = ImageHandler.wrap(imgRNACrop);
+                                ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                                 for (int o = 0; o < RNAPop.getNbObjects(); o++) {
                                     Object3D obj = RNAPop.getObject(o);
                                     double objVol = obj.getVolumeUnit();
@@ -192,10 +190,9 @@ public class mRNA_PV implements PlugIn {
                                     RNA_PV_Analyze.flush();
                                 }
                                 // save image for objects population
-                                saveRNAObjects(RNAPop, imgRNACrop, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
-                                closeImages(imgRNACrop);
+                                saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
                             }
-                            closeImages(imgRNAOrg);
+                            closeImages(imgRNA);
                             options.setSeriesOn(s, false);
                         }
                     }

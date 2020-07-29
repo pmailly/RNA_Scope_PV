@@ -181,7 +181,7 @@ public class mRNA_Scope_PV implements PlugIn {
                            // section volume in mm^3
                            double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                    * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
-                           double[] bgRNA = find_background(imgRNA);
+                           double[] bgRNA = find_background(imgRNA, null);
                            RNAPop = findCells(imgRNA, null, 8, 10, 1, "Li", false, minCellVol, maxCellVol);
                            System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                            ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
@@ -233,11 +233,11 @@ public class mRNA_Scope_PV implements PlugIn {
 
                                 // Find background
                                 System.out.println("PV");
-                                double[] bgPV = find_background(imgPV);
+                                double[] bgPV = find_background(imgPV, null);
                                 System.out.println("Tomato");
-                                double[] bgTomato = find_background(imgTomato);
+                                double[] bgTomato = find_background(imgTomato, null);
                                 System.out.println("PNN");
-                                double[] bgPNN = find_background(imgPNN);
+                                double[] bgPNN = find_background(imgPNN, null);
 
                                 /** 
                                  * Find PV, Tomato and PNN objects

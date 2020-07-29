@@ -205,23 +205,22 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             RoiManager rm = new RoiManager(false);
                             rm.runCommand("Open", roiFile);
                             Roi[] rois = rm.getRoisAsArray();
+                            rm.reset();
                             // PNN
                             System.out.println("Opening PNN channel ...");
-                            ImagePlus imgPNNOrg = BF.openImagePlus(options)[1];
+                            ImagePlus imgPNN = BF.openImagePlus(options)[1];
                             //PV
                             System.out.println("Opening PV channel ...");
-                            ImagePlus imgPVOrg = BF.openImagePlus(options)[2];
+                            ImagePlus imgPV = BF.openImagePlus(options)[2];
                             //Otx2
                             System.out.println("Opening Otx2 channel ...");
-                            ImagePlus imgOtx2Org = BF.openImagePlus(options)[0];
+                            ImagePlus imgOtx2 = BF.openImagePlus(options)[0];
                             // for all rois
                             for (Roi roi : rois) {
-                                imgPNNOrg.setRoi(roi);
                                 String roiName = roi.getName();
-                                ImagePlus imgPNN = new Duplicator().run(imgPNNOrg);
                                 // PNN background
                                 System.out.println("PNN");
-                                double[] bgPNN = find_background(imgPNN);
+                                double[] bgPNN = find_background(imgPNN, roi);
                                 // Find PNN cells with xml points file
                                 ArrayList<Point3D> PNNPoints = readXML(xmlFile);
                                 Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
@@ -229,23 +228,19 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
 
 
                                 // PV
-                                imgPVOrg.setRoi(roi);
-                                ImagePlus imgPV = new Duplicator().run(imgPVOrg);
                                 //section volume in mm^3
                                 double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                                 // PV background
                                 System.out.println("PV");
-                                double[] bgPV = find_background(imgPV);
+                                double[] bgPV = find_background(imgPV, roi);
                                 // find PV cells                          
                                 Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVolPV, maxCellVolPV);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                                 // Otx2
-                                imgOtx2Org.setRoi(roi);
-                                ImagePlus imgOtx2 = new Duplicator().run(imgOtx2Org);
                                 System.out.println("Otx2");
                                 // Otx2 background
-                                double[] bgOtx2 = find_background(imgOtx2);
+                                double[] bgOtx2 = find_background(imgOtx2, roi);
                                 // Find Otx2 cells
                                 Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, minCellVolOtx2, maxCellVolOtx2);
                                 filterCells(Otx2Pop, 0.55);
@@ -317,14 +312,10 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                             "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
                                     PNN_Analyze.flush();
                                 }
-                                closeImages(imgPNN);
-                                closeImages(imgOtx2);
-                                closeImages(imgPV);
-                                
                             }
-                            closeImages(imgPVOrg);
-                            closeImages(imgOtx2Org);
-                            closeImages(imgPNNOrg);
+                            closeImages(imgPNN);
+                            closeImages(imgOtx2);
+                            closeImages(imgPV);
                         }
                     }
                 }

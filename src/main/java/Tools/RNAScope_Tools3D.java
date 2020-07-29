@@ -12,6 +12,7 @@ import ij.Prefs;
 import ij.WindowManager;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
@@ -187,7 +188,6 @@ public class RNAScope_Tools3D {
         ImagePlus imgStack = new ImagePlus("Nucleus", stack);
         imgStack.setCalibration(cal);
         if (roi != null) {
-            roi.setLocation(0, 0);
             imgStack.setRoi(roi);
             IJ.run("Colors...", "foreground=white background=black selection=yellow");
             IJ.run(imgStack, "Clear Outside","stack");
@@ -284,31 +284,32 @@ public class RNAScope_Tools3D {
     
     /**
      * PNN Cells segmentation
-     * find PNN objects inside box 200X200 centrered to point
      * @param imgCells
      * @param roi
      * @param pts
      * @return 
      */
     public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
-        
+        ImagePlus img = new Duplicator().run(imgCells, 1, imgCells.getNSlices());
+        img.setTitle("Cell");
         Objects3DPopulation cellPop = new Objects3DPopulation();
-        double roiX = roi.getXBase();
-        double roiY = roi.getYBase();
+        RoiManager rm = new RoiManager(false);
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
-            if(roi.contains(pt.getRoundX() - (int)roiX, pt.getRoundY() - (int)roiY)) {
-                ImagePlus imgTmp = cropCell(imgCells, pt, roiX, roiY);
-                IJ.run(imgTmp, "Cell Outliner", "cell_radius=50 tolerance=0.6 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=5 all_slices");
-                ImagePlus cellOutline = WindowManager.getImage("cell Cell Outline");
-                cellOutline.hide();
-                closeImages(imgTmp);
-                Object3D obj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
-                obj.setNewCenter(pt.getRoundX(), pt.getRoundY(), pt.getRoundZ()-1);
-                cellPop.addObject(obj);
+            if(roi.contains(pt.getRoundX(), pt.getRoundY())) {
+                img.setSlice(pt.getRoundZ());
+                PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
+                rm.add(ptRoi, i);
+                img.setRoi(ptRoi);
+                IJ.run(img, "Cell Outliner", "cell_radius=50 tolerance=0.9 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=5 all_slices");
+                ImagePlus cellOutline = WindowManager.getImage("Cell Cell Outline");
+                if (cellOutline.isVisible())
+                    cellOutline.hide();
+                cellPop.addObject(Object3D_IJUtils.createObject3DVoxels(cellOutline, 1));
                 closeImages(cellOutline);
             }
         }
+        closeImages(img);
         return(cellPop);
     }
     
@@ -387,15 +388,17 @@ public class RNAScope_Tools3D {
     * read mean intensity
     * @param img 
     */
-    public static double[] find_background(ImagePlus img) {
+    public static double[] find_background(ImagePlus img, Roi roi) {
       double[] bg = new double[2];
-      img.deleteRoi();
       ImagePlus imgProj = doZProjection(img, ZProjector.MIN_METHOD);
       ImageProcessor imp = imgProj.getProcessor();
+      if (roi != null)
+          img.setRoi(roi);
       bg[0] = imp.getStatistics().mean;
       bg[1] = imp.getStatistics().stdDev;
       System.out.println("Background =  " + bg[0] + "+-" + bg[1]);
-        closeImages(imgProj);
+      closeImages(imgProj);
+      img.deleteRoi();
       return(bg);
     }
     
