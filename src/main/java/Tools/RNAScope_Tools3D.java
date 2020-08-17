@@ -247,7 +247,6 @@ public class RNAScope_Tools3D {
      */
     public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
         Objects3DPopulation cellPop = new Objects3DPopulation();
-        RoiManager rm = new RoiManager(false);
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
             int zStart =  (pt.getRoundZ() - 3 < 1) ? 1 : pt.getRoundZ() - 3;
@@ -257,7 +256,6 @@ public class RNAScope_Tools3D {
             if(roi.contains(pt.getRoundX(), pt.getRoundY())) {
                 img.setSlice(pt.getRoundZ());
                 PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
-                rm.add(ptRoi, i);
                 img.setRoi(ptRoi);
                 IJ.run(img, "Cell Outliner", "cell_radius=50 tolerance=0.9 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=6 all_slices");
                 ImagePlus cellOutline = WindowManager.getImage("Cell Cell Outline");
