@@ -286,7 +286,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                     Tomato_Analyze.flush();
                                 }
                                 // Find PNN cells with xml points file
-                                ArrayList<Point3D> PNNPoints = readXML(xmlFile);
+                                ArrayList<Point3D> PNNPoints = readXML(xmlFile, null);
                                 PNNPop = findPNNCells(imgPNN, null, PNNPoints);
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
                                 for (int o = 0; o < PNNPop.getNbObjects(); o++) {

@@ -21,6 +21,7 @@ import ij.plugin.filter.RankFilters;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import java.awt.Font;
+import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import mcib3d.geom.Object3D;
+import mcib3d.geom.Object3DVoxels;
 import mcib3d.geom.Object3D_IJUtils;
 import mcib3d.geom.Objects3DPopulation;
 import mcib3d.geom.Point3D;
@@ -235,53 +237,7 @@ public class RNAScope_Tools3D {
         return(cellPop);
     }
     
-    /**
-     * Crop  cell arround center position
-     * Keep 6 microns arround cell center
-    */
-    private static ImagePlus cropCell(ImagePlus img, Point3D pt, double roiX, double roiY) {
-        int crop = Math.round(3.00f/(float)cal.pixelDepth);
-        int stackSize = img.getNSlices();
-        int ptZ = pt.getRoundZ();
-        
-        // find start of stack
-        int Zstart = 0;
-        int start = 0;
-        for (int i = 1; i <= crop; i++) {
-            Zstart = ptZ - i;
-            if (Zstart <= 1) {
-                Zstart = 1;
-                start = i;
-                break;
-            }
-            start = i;
-        }
-        // find stop of stack
-        int Zstop = 0;
-        for (int i = 1; i <= crop; i++) {
-            Zstop = ptZ + i;
-            if (Zstop >= stackSize) {
-                Zstop = stackSize;
-                break;
-            }
-        }
-        
-        // crop
-        Roi box = new Roi(pt.getRoundX() - roiX - 100, pt.getRoundY() - roiY - 100, 200, 200);
-        img.setSlice(start + 1);
-        img.setRoi(box);
-        ImagePlus imgCrop = new Duplicator().run(img, Zstart, Zstop);
-        imgCrop.setCalibration(img.getCalibration());
-        IJ.run(imgCrop, "Laplacian of Gaussian", "sigma=5 scale_normalised negate stack");
-        Roi ptRoi = new PointRoi(100, 100);
-        imgCrop.setSlice(start + 1);
-        imgCrop.setRoi(ptRoi);
-        imgCrop.setTitle("cell");
-        img.deleteRoi();
-        return(imgCrop);
-    }
-    
-    
+ 
     /**
      * PNN Cells segmentation
      * @param imgCells
@@ -290,26 +246,30 @@ public class RNAScope_Tools3D {
      * @return 
      */
     public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
-        ImagePlus img = new Duplicator().run(imgCells, 1, imgCells.getNSlices());
-        img.setTitle("Cell");
         Objects3DPopulation cellPop = new Objects3DPopulation();
         RoiManager rm = new RoiManager(false);
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
+            int zStart =  (pt.getRoundZ() - 3 < 1) ? 1 : pt.getRoundZ() - 3;
+            int zStop = (pt.getRoundZ() + 3 > imgCells.getNSlices()) ? imgCells.getNSlices() : pt.getRoundZ() + 3;
+            ImagePlus img = new Duplicator().run(imgCells, zStart, zStop);
+            img.setTitle("Cell");
             if(roi.contains(pt.getRoundX(), pt.getRoundY())) {
                 img.setSlice(pt.getRoundZ());
                 PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
                 rm.add(ptRoi, i);
                 img.setRoi(ptRoi);
-                IJ.run(img, "Cell Outliner", "cell_radius=50 tolerance=0.9 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=5 all_slices");
+                IJ.run(img, "Cell Outliner", "cell_radius=50 tolerance=0.9 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=6 all_slices");
                 ImagePlus cellOutline = WindowManager.getImage("Cell Cell Outline");
                 if (cellOutline.isVisible())
                     cellOutline.hide();
-                cellPop.addObject(Object3D_IJUtils.createObject3DVoxels(cellOutline, 1));
+                Object3DVoxels cellObj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
+                cellObj.setNewCenter(cellObj.getCenterX(), cellObj.getCenterY(), pt.getZ());
+                cellPop.addObject(cellObj);
                 closeImages(cellOutline);
             }
+            closeImages(img);
         }
-        closeImages(img);
         return(cellPop);
     }
     
@@ -471,7 +431,7 @@ public class RNAScope_Tools3D {
      * @throws SAXException
      * @throws IOException 
      */
-    public static ArrayList<Point3D> readXML(String xmlFile) throws ParserConfigurationException, SAXException, IOException {
+    public static ArrayList<Point3D> readXML(String xmlFile, Rectangle roi) throws ParserConfigurationException, SAXException, IOException {
         ArrayList<Point3D> ptList = new ArrayList<>();
         double x = 0, y = 0 ,z = 0;
         File fXmlFile = new File(xmlFile);
@@ -484,8 +444,15 @@ public class RNAScope_Tools3D {
             Node nNode = nList.item(n);
             if (nNode.getNodeType() == Node.ELEMENT_NODE) {
                 Element eElement = (Element) nNode;
-                x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent());
-                y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent());
+                if (roi == null) {
+                    x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent());
+                    y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent());
+                }
+                else {
+                    x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent()) - roi.getX();
+                    y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent()) - roi.getY();
+                }
+                
                 z = Double.parseDouble(eElement.getElementsByTagName("MarkerZ").item(0).getTextContent());
             }
             Point3D pt = new Point3D(x, y, z);

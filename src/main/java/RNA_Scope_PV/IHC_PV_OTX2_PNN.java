@@ -36,8 +36,10 @@ import ij.measure.Calibration;
 import ij.plugin.Duplicator;
 import ij.plugin.PlugIn;
 import ij.plugin.frame.RoiManager;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import javax.xml.parsers.ParserConfigurationException;
+import loci.common.Region;
 import loci.plugins.in.ImporterOptions;
 import mcib3d.geom.Object3D;
 import mcib3d.geom.Objects3DPopulation;
@@ -178,9 +180,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                     }   
                  
                     ImporterOptions options = new ImporterOptions();
-                    options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                    options.setId(imageName);
-                    options.setSplitChannels(true);
+                    
 
                         
                     /** 
@@ -198,47 +198,53 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             IJ.showStatus("No XML or roi file found !") ;
                         }
                         else {
+                            options.setId(imageName);
+                            options.setSplitChannels(true);
+                            options.setQuiet(true);
+                            options.setCrop(true);
+                            options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                             options.setCBegin(0, 0);
                             options.setCEnd(0, 2);
                             
                             // Roi
                             RoiManager rm = new RoiManager(false);
                             rm.runCommand("Open", roiFile);
-                            Roi[] rois = rm.getRoisAsArray();
-                            rm.reset();
-                            // PNN
-                            System.out.println("Opening PNN channel ...");
-                            ImagePlus imgPNN = BF.openImagePlus(options)[1];
-                            //PV
-                            System.out.println("Opening PV channel ...");
-                            ImagePlus imgPV = BF.openImagePlus(options)[2];
-                            //Otx2
-                            System.out.println("Opening Otx2 channel ...");
-                            ImagePlus imgOtx2 = BF.openImagePlus(options)[0];
+                            
                             // for all rois
-                            for (Roi roi : rois) {
+                            for (int r = 0; r< rm.getCount(); r++) {
+                                Roi roi = rm.getRoi(r);
                                 String roiName = roi.getName();
-                                // PNN background
-                                System.out.println("PNN");
-                                double[] bgPNN = find_background(imgPNN, roi);
+                                // Find crop region
+                                Rectangle rect = roi.getBounds();
+                                Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
+                                options.setCropRegion(0, reg);
+                                
                                 // Find PNN cells with xml points file
-                                ArrayList<Point3D> PNNPoints = readXML(xmlFile);
+                                ArrayList<Point3D> PNNPoints = readXML(xmlFile, rect);
+                                roi.setLocation(0, 0);
+
+                                // PNN
+                                System.out.println("Opening PNN channel ...");
+                                ImagePlus imgPNN = BF.openImagePlus(options)[1];
+                                // PNN background
+                                double[] bgPNN = find_background(imgPNN, roi);
                                 Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
-
-
-                                // PV
+                                
+                                //PV
+                                System.out.println("Opening PV channel ...");
+                                ImagePlus imgPV = BF.openImagePlus(options)[2];
                                 //section volume in mm^3
                                 double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                                 // PV background
-                                System.out.println("PV");
                                 double[] bgPV = find_background(imgPV, roi);
                                 // find PV cells                          
                                 Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVolPV, maxCellVolPV);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
-
-                                // Otx2
-                                System.out.println("Otx2");
+                                
+                                //Otx2
+                                System.out.println("Opening Otx2 channel ...");
+                                ImagePlus imgOtx2 = BF.openImagePlus(options)[0];
                                 // Otx2 background
                                 double[] bgOtx2 = find_background(imgOtx2, roi);
                                 // Find Otx2 cells
@@ -312,10 +318,11 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                             "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
                                     PNN_Analyze.flush();
                                 }
+                                closeImages(imgPNN);
+                                closeImages(imgOtx2);
+                                closeImages(imgPV);
                             }
-                            closeImages(imgPNN);
-                            closeImages(imgOtx2);
-                            closeImages(imgPV);
+                            
                         }
                     }
                 }
