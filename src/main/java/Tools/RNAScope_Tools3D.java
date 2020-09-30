@@ -1,7 +1,6 @@
 package Tools;
 
 
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.cal;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVolPV;
 import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVolPV;
 import fiji.util.gui.GenericDialogPlus;
@@ -21,7 +20,6 @@ import ij.plugin.filter.RankFilters;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import java.awt.Font;
-import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -61,28 +59,7 @@ public class RNAScope_Tools3D {
     }
     
     
-    /**
-     * Ask for parameters
-     * @param channels
-     * @param imageDir
-     * @return 
-     */
     
-    public static ArrayList dialog(String[] channels) {
-        ArrayList ch = new ArrayList();
-        GenericDialogPlus gd = new GenericDialogPlus("IHC PV parameters");
-        gd.addMessage("Choose channels");
-        gd.addChoice("Otx2 cells", channels, channels[0]);
-        gd.addChoice("PNN cells", channels, channels[1]);
-        gd.addChoice("PV cells", channels, channels[2]);
-        gd.showDialog();
-        ch.add(0, gd.getNextChoice());
-        ch.add(1, gd.getNextChoice());
-        ch.add(2, gd.getNextChoice());
-        if(gd.wasCanceled())
-            ch = null;
-        return(ch);
-    }
     
   /**
      * return objects population in an binary image
@@ -166,7 +143,7 @@ public class RNAScope_Tools3D {
      */
     public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, double minCellVol, double maxCellVol) {
         ImagePlus img = new Duplicator().run(imgCells);
-        img.setCalibration(cal);
+        img.setCalibration(imgCells.getCalibration());
         if (removeOutliers)
             IJ.run(img, "Remove Outliers...", "radius=10 threshold=1 which=Bright stack");
         median_filter(img, med);
@@ -181,14 +158,14 @@ public class RNAScope_Tools3D {
             ImagePlus mask = new ImagePlus("mask", img.createRoiMask().getBufferedImage());
             ImageProcessor ip =  mask.getProcessor();
             ip.invertLut();
-            for (int n = 0; n < 3; n++) {
-                ip.erode();
-                ip.dilate();
-            }
+//            for (int n = 0; n < 3; n++) {
+//                ip.erode();
+//                ip.dilate();
+//            }
             stack.addSlice(ip);
         }
         ImagePlus imgStack = new ImagePlus("Nucleus", stack);
-        imgStack.setCalibration(cal);
+        imgStack.setCalibration(imgCells.getCalibration());
         if (roi != null) {
             imgStack.setRoi(roi);
             IJ.run("Colors...", "foreground=white background=black selection=yellow");
@@ -212,7 +189,7 @@ public class RNAScope_Tools3D {
      */
     public static Objects3DPopulation findCellsPiriform(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th) {
         ImagePlus img = new Duplicator().run(imgCells);
-        img.setCalibration(cal);
+        img.setCalibration(imgCells.getCalibration());
         median_filter(img, med);
         IJ.run(img, "Difference of Gaussians", "  sigma1=12 sigma2=10 stack");
         img.setSlice(img.getNSlices()/2);
@@ -247,27 +224,31 @@ public class RNAScope_Tools3D {
      */
     public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
         Objects3DPopulation cellPop = new Objects3DPopulation();
+        double cellRadius = 10 / imgCells.getCalibration().pixelWidth;
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
-            int zStart =  (pt.getRoundZ() - 3 < 1) ? 1 : pt.getRoundZ() - 3;
-            int zStop = (pt.getRoundZ() + 3 > imgCells.getNSlices()) ? imgCells.getNSlices() : pt.getRoundZ() + 3;
+            int zStart =  (pt.getRoundZ() - 2 < 1) ? 1 : pt.getRoundZ() - 2;
+            int zStop = (pt.getRoundZ() + 2 > imgCells.getNSlices()) ? imgCells.getNSlices() : pt.getRoundZ() + 2;
             ImagePlus img = new Duplicator().run(imgCells, zStart, zStop);
+            img.setCalibration(imgCells.getCalibration());
             img.setTitle("Cell");
             if(roi.contains(pt.getRoundX(), pt.getRoundY())) {
-                img.setSlice(pt.getRoundZ());
+                img.setSlice(img.getNSlices() / 2);
                 PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
                 img.setRoi(ptRoi);
-                IJ.run(img, "Cell Outliner", "cell_radius=50 tolerance=0.9 kernel_width=13 kernel_smoothing=1 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=6 all_slices");
+                IJ.run(img, "Cell Outliner", "cell_radius="+cellRadius+" tolerance=0.8 kernel_width=8 kernel_smoothing=2 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=0 all_slices");
                 ImagePlus cellOutline = WindowManager.getImage("Cell Cell Outline");
                 if (cellOutline.isVisible())
                     cellOutline.hide();
+                cellOutline.deleteRoi();
                 Object3DVoxels cellObj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
-                cellObj.setNewCenter(cellObj.getCenterX(), cellObj.getCenterY(), pt.getZ());
+                cellObj.setNewCenter(cellObj.getCenterX(), cellObj.getCenterY(), pt.getRoundZ()-2);
                 cellPop.addObject(cellObj);
                 closeImages(cellOutline);
             }
             closeImages(img);
         }
+        cellPop.setCalibration(imgCells.getCalibration().pixelWidth, imgCells.getCalibration().pixelDepth,"microns");
         return(cellPop);
     }
     
@@ -275,8 +256,10 @@ public class RNAScope_Tools3D {
         Object3D objAsso = null;
         for (int i = 0; i < pop.getNbObjects(); i ++) {
             Object3D obj = pop.getObject(i);
-            if (cellObj.hasOneVoxelColoc(obj) || cellObj.includesBox(obj))
+            if (cellObj.hasOneVoxelColoc(obj)) {
                 objAsso = obj;
+                return(objAsso);
+            }
         }
         return(objAsso);
     }
@@ -289,7 +272,7 @@ public class RNAScope_Tools3D {
         labelsObject(cellsPop, imgObjs.getImagePlus());
         ImagePlus[] imgColors = {null, imgObjs.getImagePlus(), null, imgCells};
         ImagePlus imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors, false);
-        imgObjects.setCalibration(cal);
+        imgObjects.setCalibration(imgCells.getCalibration());
         FileSaver ImgObjectsFile = new FileSaver(imgObjects);
         ImgObjectsFile.saveAsTiff(name); 
         imgObjs.closeImagePlus();
@@ -298,28 +281,29 @@ public class RNAScope_Tools3D {
     public static void saveIHCObjects(Objects3DPopulation PVPop, Objects3DPopulation Otx2Pop, Objects3DPopulation PNNPop, ImagePlus imgCells, String name) {
        // PVPop blue Otx2Pop/Tomato red PNNPop green
         ImageHandler pvImgObj = ImageHandler.wrap(imgCells).createSameDimensions();
-        ImageHandler Otx2ImgObj = pvImgObj.duplicate();
+        ImageHandler otx2ImgObj = pvImgObj.duplicate();
         ImageHandler pnnImgObj = pvImgObj.duplicate();
         // draw obj population
         if (PVPop != null) {
             PVPop.draw(pvImgObj, 64);
             labelsObject(PVPop, pvImgObj.getImagePlus());
         }
-        if (Otx2Pop != null)
-            Otx2Pop.draw(Otx2ImgObj, 64);
-            labelsObject(Otx2Pop, Otx2ImgObj.getImagePlus());
+        if (Otx2Pop != null) {
+            Otx2Pop.draw(otx2ImgObj, 64);
+            labelsObject(Otx2Pop, otx2ImgObj.getImagePlus());
+        }
         if (PNNPop != null) {
             PNNPop.draw(pnnImgObj, 64);
             labelsObject(PNNPop, pnnImgObj.getImagePlus());
         }
         
-        ImagePlus[] imgColors = {Otx2ImgObj.getImagePlus(), pnnImgObj.getImagePlus(), pvImgObj.getImagePlus(), imgCells};
+        ImagePlus[] imgColors = {otx2ImgObj.getImagePlus(), pnnImgObj.getImagePlus(), pvImgObj.getImagePlus(), imgCells};
         ImagePlus imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors, true);
-        imgObjects.setCalibration(cal);
+        imgObjects.setCalibration(imgCells.getCalibration());
         FileSaver ImgObjectsFile = new FileSaver(imgObjects);
         ImgObjectsFile.saveAsTiff(name); 
         pvImgObj.closeImagePlus(); 
-        Otx2ImgObj.closeImagePlus();
+        otx2ImgObj.closeImagePlus();
         pnnImgObj.closeImagePlus();
     }
 
@@ -346,17 +330,14 @@ public class RNAScope_Tools3D {
     * read mean intensity
     * @param img 
     */
-    public static double[] find_background(ImagePlus img, Roi roi) {
+    public static double[] find_background(ImagePlus img) {
       double[] bg = new double[2];
       ImagePlus imgProj = doZProjection(img, ZProjector.MIN_METHOD);
       ImageProcessor imp = imgProj.getProcessor();
-      if (roi != null)
-          img.setRoi(roi);
       bg[0] = imp.getStatistics().mean;
       bg[1] = imp.getStatistics().stdDev;
       System.out.println("Background =  " + bg[0] + "+-" + bg[1]);
       closeImages(imgProj);
-      img.deleteRoi();
       return(bg);
     }
     
@@ -404,7 +385,7 @@ public class RNAScope_Tools3D {
      * @param img 
      */
     public static void labelsObject (Objects3DPopulation popObj, ImagePlus img) {
-        int fontSize = Math.round(10f/(float)cal.pixelWidth);
+        int fontSize = Math.round(10f/(float)img.getCalibration().pixelWidth);
         Font tagFont = new Font("SansSerif", Font.PLAIN, fontSize);
         for (int n = 0; n < popObj.getNbObjects(); n++) {
             Object3D obj = popObj.getObject(n);
@@ -429,7 +410,7 @@ public class RNAScope_Tools3D {
      * @throws SAXException
      * @throws IOException 
      */
-    public static ArrayList<Point3D> readXML(String xmlFile, Rectangle roi) throws ParserConfigurationException, SAXException, IOException {
+    public static ArrayList<Point3D> readXML(String xmlFile, Roi roi) throws ParserConfigurationException, SAXException, IOException {
         ArrayList<Point3D> ptList = new ArrayList<>();
         double x = 0, y = 0 ,z = 0;
         File fXmlFile = new File(xmlFile);
@@ -442,15 +423,12 @@ public class RNAScope_Tools3D {
             Node nNode = nList.item(n);
             if (nNode.getNodeType() == Node.ELEMENT_NODE) {
                 Element eElement = (Element) nNode;
-                if (roi == null) {
-                    x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent());
-                    y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent());
+                x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent());
+                y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent());
+                if (roi != null) {
+                    x = x - roi.getXBase();
+                    y = y - roi.getYBase();
                 }
-                else {
-                    x = Double.parseDouble(eElement.getElementsByTagName("MarkerX").item(0).getTextContent()) - roi.getX();
-                    y = Double.parseDouble(eElement.getElementsByTagName("MarkerY").item(0).getTextContent()) - roi.getY();
-                }
-                
                 z = Double.parseDouble(eElement.getElementsByTagName("MarkerZ").item(0).getTextContent());
             }
             Point3D pt = new Point3D(x, y, z);

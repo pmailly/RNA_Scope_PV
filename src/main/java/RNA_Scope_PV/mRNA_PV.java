@@ -58,8 +58,8 @@ public class mRNA_PV implements PlugIn {
     public  static String outDirResults = "";
     public  static String rootName = "";
     public static Calibration cal = new Calibration();
-    public static double minCellVol = 600;
-    public static double maxCellVol = 20000;
+    public static double minCellVol = 500;
+    public static double maxCellVol = 10000;
     public static BufferedWriter RNA_PV_Analyze;
 
     
@@ -169,7 +169,7 @@ public class mRNA_PV implements PlugIn {
                                 // section volume in mm^3
                                 double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                         * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
-                                double[] bgRNA = find_background(imgRNA, roi);
+                                double[] bgRNA = find_background(imgRNA);
                                 Objects3DPopulation RNAPop = new Objects3DPopulation();
                                 if (seriesName.contains("Visuel"))
                                     RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, minCellVol, maxCellVol);
@@ -184,9 +184,9 @@ public class mRNA_PV implements PlugIn {
                                     double objInt = obj.getIntegratedDensity(imhRNA);
                                     if (o == 0)
                                         RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                            bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * objVol)) + "\n");
+                                            bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                     else 
-                                        RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * objVol)) + "\n");
+                                        RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                     RNA_PV_Analyze.flush();
                                 }
                                 // save image for objects population
