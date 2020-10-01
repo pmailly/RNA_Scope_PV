@@ -300,7 +300,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                     double tomatoCellIntChTomato = tomatoCell.getIntegratedDensity(imhTomato);
                                     double tomatoCellIntChTomatoCor = tomatoCellIntChTomato - (bgTomato[0] * tomatoCell.getVolumePixels());
                                     double tomatoCellIntChPVCor = tomatoCell.getIntegratedDensity(imhPV) - (bgPV[0] * tomatoCell.getVolumePixels());
-                                    double tomatoCellIntChPNNCor = tomatoCellDonut.getIntegratedDensity(imhPNN) - (bgPV[0] * tomatoCellDonut.getVolumePixels());
+                                    double tomatoCellIntChPNNCor = tomatoCellDonut.getIntegratedDensity(imhPNN) - (bgPNN[0] * tomatoCellDonut.getVolumePixels());
 
 
                                     // Write results
