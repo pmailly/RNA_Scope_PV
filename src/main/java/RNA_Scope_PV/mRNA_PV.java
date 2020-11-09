@@ -7,6 +7,8 @@ import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findCellsPiriform;
 import static Tools.RNAScope_Tools3D.findRoi;
 import static Tools.RNAScope_Tools3D.find_background;
+import static Tools.RNAScope_Tools3D.maxCellVol;
+import static Tools.RNAScope_Tools3D.minCellVol;
 import static Tools.RNAScope_Tools3D.saveRNAObjects;
 import ij.IJ;
 import ij.ImagePlus;
@@ -58,8 +60,6 @@ public class mRNA_PV implements PlugIn {
     public  static String outDirResults = "";
     public  static String rootName = "";
     public static Calibration cal = new Calibration();
-    public static double minCellVol = 500;
-    public static double maxCellVol = 10000;
     public static BufferedWriter RNA_PV_Analyze;
 
     
@@ -198,7 +198,8 @@ public class mRNA_PV implements PlugIn {
                     }
                 }
             }
-            RNA_PV_Analyze.close();
+            if (RNA_PV_Analyze != null)
+                RNA_PV_Analyze.close();
             IJ.showStatus("Process done ...");
         } catch (DependencyException | ServiceException | FormatException | IOException ex) {
             Logger.getLogger(mRNA_PV.class.getName()).log(Level.SEVERE, null, ex);

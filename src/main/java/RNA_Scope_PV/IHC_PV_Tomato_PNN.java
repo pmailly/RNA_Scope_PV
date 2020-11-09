@@ -8,6 +8,8 @@ import static Tools.RNAScope_Tools3D.findAssociatedCell;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findPNNCells;
 import static Tools.RNAScope_Tools3D.find_background;
+import static Tools.RNAScope_Tools3D.maxCellVol;
+import static Tools.RNAScope_Tools3D.minCellVol;
 import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import fiji.util.gui.GenericDialogPlus;
@@ -66,10 +68,6 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
     // threshold to keep PV and Tomato cells
     public static double PVMinInt, TomatoMinInt;
     public static double sphCell = 0.5;
-    public static double minCellVolTomato = 600;
-    public static double maxCellVolTomato = 10000;
-    public static double minCellVolPV = 500;
-    public static double maxCellVolPV = 10000;
     public static BufferedWriter PV_Analyze, Tomato_Analyze, PNN_Analyze;
 
     
@@ -246,7 +244,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 // PV background
                                 double[] bgPV = find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVolPV, maxCellVolPV);
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVol, maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
                                 
                                 //Tomato
@@ -256,7 +254,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 // Tomato background
                                 double[] bgTomato = find_background(imgTomato);
                                 // Find Tomato cells
-                                Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Triangle", true, minCellVolTomato, maxCellVolTomato);
+                                Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Triangle", true, minCellVol, maxCellVol);
                                 filterCells(TomatoPop, 0.55);
                                 System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 
@@ -317,7 +315,8 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                         }
                     }
                 }
-                Tomato_Analyze.close();
+                if (Tomato_Analyze != null) 
+                    Tomato_Analyze.close();
             
             } catch (IOException | DependencyException | ServiceException | FormatException | ParserConfigurationException | SAXException ex) {
                 Logger.getLogger(IHC_PV_Tomato_PNN.class.getName()).log(Level.SEVERE, null, ex);

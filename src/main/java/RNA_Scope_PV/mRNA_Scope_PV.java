@@ -7,6 +7,8 @@ import static Tools.RNAScope_Tools3D.findAssociatedCell;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findPNNCells;
 import static Tools.RNAScope_Tools3D.find_background;
+import static Tools.RNAScope_Tools3D.maxCellVol;
+import static Tools.RNAScope_Tools3D.minCellVol;
 import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import static Tools.RNAScope_Tools3D.saveRNAObjects;
@@ -62,8 +64,6 @@ public class mRNA_Scope_PV implements PlugIn {
     // threshold to keep PV and Tomato cells
     public static double PVMinInt, TomatoMinInt;
     public static double sphCell = 0.5;
-    public static double minCellVol = 500;
-    public static double maxCellVol = 10000;
 
 
            
@@ -327,10 +327,12 @@ public class mRNA_Scope_PV implements PlugIn {
                     }
                 }
             }
-            RNAScope_Analyze.close();
-            PV_Analyze.close();
-            Tomato_Analyze.close();
-            PNN_Analyze.close();
+            if (RNAScope_Analyze != null) {
+                RNAScope_Analyze.close();
+                PV_Analyze.close();
+                Tomato_Analyze.close();
+                PNN_Analyze.close();
+            }
         } catch (IOException | DependencyException | ServiceException | FormatException | ParserConfigurationException | SAXException ex) {
             Logger.getLogger(mRNA_Scope_PV.class.getName()).log(Level.SEVERE, null, ex);
         }

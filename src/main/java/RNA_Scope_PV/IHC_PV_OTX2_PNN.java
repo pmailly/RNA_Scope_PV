@@ -8,6 +8,8 @@ import static Tools.RNAScope_Tools3D.findAssociatedCell;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findPNNCells;
 import static Tools.RNAScope_Tools3D.find_background;
+import static Tools.RNAScope_Tools3D.maxCellVol;
+import static Tools.RNAScope_Tools3D.minCellVol;
 import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import fiji.util.gui.GenericDialogPlus;
@@ -66,10 +68,6 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
     // threshold to keep PV and Otx2 cells
     public static double PVMinInt, Otx2MinInt;
     public static double sphCell = 0.5;
-    public static double minCellVolOtx2 = 600;
-    public static double maxCellVolOtx2 = 10000;
-    public static double minCellVolPV = 500;
-    public static double maxCellVolPV = 10000;
     public static BufferedWriter PV_Analyze, Otx2_Analyze, PNN_Analyze;
 
     
@@ -173,8 +171,9 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                     int chs = reader.getSizeC();
                     String[] ch = new String[chs];
                     if (chs > 1) {
-                        for (int n = 0; n < chs; n++)
+                        for (int n = 0; n < chs; n++) {
                             ch[n] = meta.getChannelName(0, n).split("_")[1];
+                        }
                     }
                     if (imageNum == 1) {   
                         // read image calibration
@@ -202,7 +201,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
 
                         
                     /** 
-                     * read nd
+                     * 
                      * Detect IHC PV cells, measure intensity in PV channel2 and Otx2 channel1
                      * compute donut PV Object and measure in PNN channel0
                      * Detect Otx2 cells measure intensity in Otx2 and PV channels
@@ -260,7 +259,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 // PV background
                                 double[] bgPV = find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVolPV, maxCellVolPV);
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVol, maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
                                 
                                 //Otx2
@@ -270,7 +269,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 // Otx2 background
                                 double[] bgOtx2 = find_background(imgOtx2);
                                 // Find Otx2 cells
-                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, minCellVolOtx2, maxCellVolOtx2);
+                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, minCellVol, maxCellVol);
                                 filterCells(Otx2Pop, 0.55);
                                 System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
 
@@ -350,9 +349,11 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                         }
                     }
                 }
-                PV_Analyze.close();
-                Otx2_Analyze.close();
-                PNN_Analyze.close();
+                if (PV_Analyze != null) {
+                    PV_Analyze.close();
+                    Otx2_Analyze.close();
+                    PNN_Analyze.close();
+                }
             
             } catch (IOException | DependencyException | ServiceException | FormatException | ParserConfigurationException | SAXException ex) {
                 Logger.getLogger(IHC_PV_OTX2_PNN.class.getName()).log(Level.SEVERE, null, ex);

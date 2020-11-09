@@ -1,8 +1,5 @@
 package Tools;
 
-
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.maxCellVolPV;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.minCellVolPV;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
@@ -48,6 +45,10 @@ import org.xml.sax.SAXException;
  */
 
 public class RNAScope_Tools3D {
+    
+
+    public static double minCellVol= 500;
+    public static double maxCellVol = 15000;
    
     /**
      *
@@ -136,9 +137,14 @@ public class RNAScope_Tools3D {
     /**
      * Cells segmentation
      * @param imgCells
+     * @param roi
      * @param blur1
      * @param blur2
+     * @param med
      * @param th
+     * @param removeOutliers
+     * @param minCellVol
+     * @param maxCellVol
      * @return 
      */
     public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, double minCellVol, double maxCellVol) {
@@ -151,8 +157,8 @@ public class RNAScope_Tools3D {
         for (int i = 1; i <= img.getStackSize(); i++) {
             img.setZ(i);
             img.updateAndDraw();
-            IJ.run(img, "Nuclei Outline", "blur="+blur1+" blur2="+blur2+" threshold_method="+th+" outlier_radius=15 outlier_threshold=1 max_nucleus_size=400 "
-                    + "min_nucleus_size=80 erosion=5 expansion_inner=5 expansion=5 results_overlay");
+            IJ.run(img, "Nuclei Outline", "blur="+blur1+" blur2="+blur2+" threshold_method="+th+" outlier_radius=0 outlier_threshold=1 max_nucleus_size=500 "
+                    + "min_nucleus_size=50 erosion=5 expansion_inner=5 expansion=5 results_overlay");
             img.setZ(1);
             img.updateAndDraw();
             ImagePlus mask = new ImagePlus("mask", img.createRoiMask().getBufferedImage());
@@ -208,7 +214,7 @@ public class RNAScope_Tools3D {
             }
         }
 
-        Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(img).getObjectsWithinVolume​(minCellVolPV, maxCellVolPV, true));
+        Objects3DPopulation cellPop = new Objects3DPopulation(getPopFromImage(img).getObjectsWithinVolume​(minCellVol, maxCellVol, true));
         cellPop.removeObjectsTouchingBorders(img, false);
         closeImages(img);
         return(cellPop);
