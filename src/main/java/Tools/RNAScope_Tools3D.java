@@ -229,8 +229,21 @@ public class RNAScope_Tools3D {
      * @return 
      */
     public static Objects3DPopulation findPNNCells(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
+        CellOutliner cellsOutline = new CellOutliner();
         Objects3DPopulation cellPop = new Objects3DPopulation();
-        double cellRadius = 10 / imgCells.getCalibration().pixelWidth;
+        int cellRadius = (int)Math.round(10 / imgCells.getCalibration().pixelWidth);
+        cellsOutline.cellRadius = cellRadius;
+        cellsOutline.tolerance = 0.8;
+        cellsOutline.darkEdge = true;
+        cellsOutline.dilate = 0;
+        cellsOutline.iterations = 3;
+        cellsOutline.polygonSmoothing = 1;
+        cellsOutline.kernelWidth = 7;
+        cellsOutline.weightingGamma = 3;
+        cellsOutline.kernelSmoothing = 2; 
+        cellsOutline.processAllSlices = true;
+        cellsOutline.buildMaskOutput = true;
+        
         for (int i = 0; i < pts.size(); i++) {
             Point3D pt = pts.get(i);
             int zStart =  (pt.getRoundZ() - 2 < 1) ? 1 : pt.getRoundZ() - 2;
@@ -242,10 +255,10 @@ public class RNAScope_Tools3D {
                 img.setSlice(img.getNSlices() / 2);
                 PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
                 img.setRoi(ptRoi);
-                IJ.run(img, "Cell Outliner", "cell_radius="+cellRadius+" tolerance=0.8 kernel_width=8 kernel_smoothing=2 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=0 all_slices");
-                ImagePlus cellOutline = WindowManager.getImage("Cell Cell Outline");
-                if (cellOutline.isVisible())
-                    cellOutline.hide();
+                //IJ.run(img, "Cell Outliner", "cell_radius="+cellRadius+" tolerance=0.8 kernel_width=8 kernel_smoothing=2 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=0 all_slices");
+                cellsOutline.setup("", img);
+                cellsOutline.run(img.getProcessor());
+                ImagePlus cellOutline = cellsOutline.maskImp;
                 cellOutline.deleteRoi();
                 Object3DVoxels cellObj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
                 cellObj.setNewCenter(cellObj.getCenterX(), cellObj.getCenterY(), pt.getRoundZ()-2);
