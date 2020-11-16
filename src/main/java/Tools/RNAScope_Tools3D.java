@@ -1,14 +1,11 @@
 package Tools;
 
-import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
-import ij.WindowManager;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
@@ -132,7 +129,12 @@ public class RNAScope_Tools3D {
         }
     }
   
-    
+    /**
+     * Remove outliers
+     */
+    public static void removeOutliers(ImagePlus img, int rad) {
+        
+    }
     
     /**
      * Cells segmentation
@@ -147,11 +149,11 @@ public class RNAScope_Tools3D {
      * @param maxCellVol
      * @return 
      */
-    public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, double minCellVol, double maxCellVol) {
+    public static Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, int rad, double minCellVol, double maxCellVol) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(imgCells.getCalibration());
         if (removeOutliers)
-            IJ.run(img, "Remove Outliers...", "radius=10 threshold=1 which=Bright stack");
+            IJ.run(imgCells, "Remove Outliers", "block_radius_x="+rad+" block_radius_y="+rad+" standard_deviations=1 stack");
         median_filter(img, med);
         ImageStack stack = new ImageStack(img.getWidth(), img.getHeight());
         for (int i = 1; i <= img.getStackSize(); i++) {
@@ -255,7 +257,6 @@ public class RNAScope_Tools3D {
                 img.setSlice(img.getNSlices() / 2);
                 PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
                 img.setRoi(ptRoi);
-                //IJ.run(img, "Cell Outliner", "cell_radius="+cellRadius+" tolerance=0.8 kernel_width=8 kernel_smoothing=2 polygon_smoothing=1 weighting_gamma=3 iterations=3 dilate=0 all_slices");
                 cellsOutline.setup("", img);
                 cellsOutline.run(img.getProcessor());
                 ImagePlus cellOutline = cellsOutline.maskImp;
@@ -404,7 +405,7 @@ public class RNAScope_Tools3D {
      * @param img 
      */
     public static void labelsObject (Objects3DPopulation popObj, ImagePlus img) {
-        int fontSize = Math.round(10f/(float)img.getCalibration().pixelWidth);
+        int fontSize = Math.round(12f/(float)img.getCalibration().pixelWidth);
         Font tagFont = new Font("SansSerif", Font.PLAIN, fontSize);
         for (int n = 0; n < popObj.getNbObjects(); n++) {
             Object3D obj = popObj.getObject(n);

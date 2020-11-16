@@ -182,7 +182,7 @@ public class mRNA_Scope_PV implements PlugIn {
                            double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                    * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
                            double[] bgRNA = find_background(imgRNA);
-                           RNAPop = findCells(imgRNA, null, 8, 10, 1, "Li", false, minCellVol, maxCellVol);
+                           RNAPop = findCells(imgRNA, null, 8, 10, 1, "Li", false, 0, minCellVol, maxCellVol);
                            System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                            ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                            for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -247,7 +247,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                 float dilatedStepZ = (float) (6/cal.pixelDepth);
 
                                 // PV
-                                PVPop = findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, minCellVol, maxCellVol);
+                                PVPop = findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
                                 
                                 // filter again sphericity and intensity
@@ -272,7 +272,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                     PV_Analyze.flush();
                                 }
                                 // Tomato
-                                TomatoPop = findCells(imgTomato, null, 8, 10, 1, "Yen", false, minCellVol, maxCellVol);
+                                TomatoPop = findCells(imgTomato, null, 8, 10, 1, "Yen", false, 0, minCellVol, maxCellVol);
                                 System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects());
                                 TomatoDonutPop  = createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                                 for (int o = 0; o < TomatoPop.getNbObjects(); o++) {

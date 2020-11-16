@@ -46,6 +46,7 @@ import mcib3d.geom.Objects3DPopulation;
 import mcib3d.geom.Point3D;
 import mcib3d.image3d.ImageHandler;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.xml.sax.SAXException;
 
 
@@ -194,8 +195,9 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                     */
 
                        // Find xml points file
-                        String xmlFile = inDir+ File.separator + rootName + ".xml";
-                        String roiFile = inDir+ File.separator + rootName + ".zip";
+                        String rootFilename =  inDir+ File.separator + rootName;
+                        String xmlFile = rootFilename + ".xml";
+                        String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
                         if (!new File(xmlFile).exists() || !new File(roiFile).exists()) {
                             IJ.showStatus("No XML or roi file found !") ;
                         }
@@ -205,8 +207,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                             options.setQuiet(true);
                             options.setCrop(true);
                             options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                            options.setCBegin(0, 0);
-                            options.setCEnd(0, 2);
+
                             
                             // Roi
                             RoiManager rm = new RoiManager(false);
@@ -227,8 +228,8 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
 
                                 // PNN
                                 System.out.println("ROI : "+roiName);
-                                System.out.println("Opening PNN channel ...");
-                                int channel = channels.indexOf(ch[1]);
+                                System.out.println("Opening PNN channel " + channels.get(1) +" ...");
+                                int channel = ArrayUtils.indexOf(ch, channels.get(1));
                                 ImagePlus imgPNN = BF.openImagePlus(options)[channel];
                                 // PNN background
                                 double[] bgPNN = find_background(imgPNN);
@@ -236,25 +237,25 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects() + " in " + roiName);
                                 
                                 //PV
-                                System.out.println("Opening PV channel ...");
-                                channel = channels.indexOf(ch[2]);
+                                System.out.println("Opening PV channel " + channels.get(2)+ " ...");
+                                channel = ArrayUtils.indexOf(ch, channels.get(2));
                                 ImagePlus imgPV = BF.openImagePlus(options)[channel];
                                 //section volume in mm^3
                                 double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                                 // PV background
                                 double[] bgPV = find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVol, maxCellVol);
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, minCellVol, maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
                                 
                                 //Tomato
-                                System.out.println("Opening Tomato channel ...");
-                                channel = channels.indexOf(ch[0]);
+                                System.out.println("Opening Tomato channel " + channels.get(0) +" ...");
+                                channel = ArrayUtils.indexOf(ch, channels.get(0));
                                 ImagePlus imgTomato = BF.openImagePlus(options)[channel];
                                 // Tomato background
                                 double[] bgTomato = find_background(imgTomato);
                                 // Find Tomato cells
-                                Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Triangle", true, minCellVol, maxCellVol);
+                                Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Triangle", true, 20, minCellVol, maxCellVol);
                                 filterCells(TomatoPop, 0.55);
                                 System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 

@@ -5,6 +5,7 @@
  */
 package RNA_Scope_PV;
 
+import static RNA_Scope_PV.IHC_PV_Tomato_PNN.rootName;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.createDonutPop;
@@ -188,8 +189,9 @@ public class IHC_OTX2_PNN implements PlugIn {
                         writeHeaders();
                     }
                     
-                    // Find roi file name
-                    String roiFile = inDir+ File.separator + rootName + ".zip";
+                    // Find xml points file
+                    String rootFilename =  inDir+ File.separator + rootName;
+                    String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
                     if (!new File(roiFile).exists()) {
                         IJ.showStatus("No roi file found !") ;
                         return;
@@ -261,7 +263,7 @@ public class IHC_OTX2_PNN implements PlugIn {
                                         // OTX2 background
                                         double[] bgOTX2 = find_background(imgOTX2);
                                         // find OTX2 cells                          
-                                        Objects3DPopulation OTX2Pop = findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, minCellVol, maxCellVol);
+                                        Objects3DPopulation OTX2Pop = findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
                                         System.out.println("OTX2 Cells found : " + OTX2Pop.getNbObjects());
                                
                                         // save image for objects population

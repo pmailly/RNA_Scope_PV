@@ -172,7 +172,7 @@ public class mRNA_PV implements PlugIn {
                                 double[] bgRNA = find_background(imgRNA);
                                 Objects3DPopulation RNAPop = new Objects3DPopulation();
                                 if (seriesName.contains("Visuel"))
-                                    RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, minCellVol, maxCellVol);
+                                    RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, minCellVol, maxCellVol);
                                 else
                                     RNAPop = findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
                                 filterCells(RNAPop, 0.45);

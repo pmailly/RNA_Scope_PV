@@ -1,6 +1,7 @@
 package RNA_Scope_PV;
 
 
+import static RNA_Scope_PV.IHC_PV_Tomato_PNN.rootName;
 import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.createDonutPop;
 import static Tools.RNAScope_Tools3D.filterCells;
@@ -209,8 +210,9 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                     */
 
                        // Find xml points file
-                        String xmlFile = inDir+ File.separator + rootName + ".xml";
-                        String roiFile = inDir+ File.separator + rootName + ".zip";
+                        String rootFilename =  inDir+ File.separator + rootName;
+                        String xmlFile = rootFilename + ".xml";
+                        String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
                         if (!new File(xmlFile).exists() || !new File(roiFile).exists()) {
                             IJ.showStatus("No XML or roi file found !") ;
                         }
@@ -259,7 +261,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 // PV background
                                 double[] bgPV = find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, minCellVol, maxCellVol);
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 10, minCellVol, maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
                                 
                                 //Otx2
@@ -269,7 +271,7 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                                 // Otx2 background
                                 double[] bgOtx2 = find_background(imgOtx2);
                                 // Find Otx2 cells
-                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, minCellVol, maxCellVol);
+                                Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, 10, minCellVol, maxCellVol);
                                 filterCells(Otx2Pop, 0.55);
                                 System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
 

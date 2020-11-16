@@ -5,6 +5,7 @@
  */
 package RNA_Scope_PV;
 
+import static RNA_Scope_PV.IHC_PV_Tomato_PNN.rootName;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.createDonutPop;
@@ -188,10 +189,11 @@ public class IHC_PV_PNN implements PlugIn {
                         writeHeaders();
                     }
                     
-                    // Find roi file name
-                    String roiFile = inDir+ File.separator + rootName + ".zip";
+                    // Find xml points file
+                    String rootFilename =  inDir+ File.separator + rootName;
+                    String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
                     if (!new File(roiFile).exists()) {
-                        IJ.showStatus("No roi file found !") ;
+                        IJ.showStatus("No roi file found !");
                         return;
                     }
                     else {
@@ -261,7 +263,7 @@ public class IHC_PV_PNN implements PlugIn {
                                         // PV background
                                         double[] bgPV = find_background(imgPV);
                                         // find PV cells                          
-                                        Objects3DPopulation PVPop = findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, minCellVol, maxCellVol);
+                                        Objects3DPopulation PVPop = findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
                                         System.out.println("PV Cells found : " + PVPop.getNbObjects());
                                
                                         // save image for objects population
