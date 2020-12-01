@@ -5,11 +5,14 @@
  */
 package RNA_Scope_PV;
 
-import static RNA_Scope_PV.IHC_PV_Tomato_PNN.rootName;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.createDonutPop;
+import static Tools.RNAScope_Tools3D.dialog;
 import static Tools.RNAScope_Tools3D.findAssociatedCell;
+import static Tools.RNAScope_Tools3D.findChannels;
+import static Tools.RNAScope_Tools3D.findImageCalib;
+import static Tools.RNAScope_Tools3D.findImages;
 import static Tools.RNAScope_Tools3D.findPNNCells;
 import static Tools.RNAScope_Tools3D.find_background;
 import static Tools.RNAScope_Tools3D.maxCellVol;
@@ -17,7 +20,6 @@ import static Tools.RNAScope_Tools3D.median_filter;
 import static Tools.RNAScope_Tools3D.minCellVol;
 import static Tools.RNAScope_Tools3D.readXML;
 import static Tools.RNAScope_Tools3D.saveIHCObjects;
-import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -27,7 +29,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import loci.common.services.DependencyException;
@@ -43,6 +44,7 @@ import ij.plugin.PlugIn;
 import ij.plugin.frame.RoiManager;
 import java.awt.Rectangle;
 import java.util.ArrayList;
+import java.util.List;
 import javax.xml.parsers.ParserConfigurationException;
 import loci.common.Region;
 import loci.plugins.in.ImporterOptions;
@@ -65,7 +67,6 @@ public class IHC_PV_PNN implements PlugIn {
     private String imageDir = "";
     public  static String outDirResults = "";
     public  static String rootName = "";
-    public static Calibration cal = new Calibration();
     // threshold to keep PV cells
     public static double PVMinInt;
     public static double sphCell = 0.5;
@@ -94,29 +95,7 @@ public class IHC_PV_PNN implements PlugIn {
                 PNN_Analyze.flush();
     }
     
-    /**
-     * Ask for parameters
-     * @param channels
-     * @param imageDir
-     * @return 
-     */
     
-    public static ArrayList dialog(String[] channels) {
-        ArrayList ch = new ArrayList();
-        GenericDialogPlus gd = new GenericDialogPlus("IHC PV parameters");
-        gd.addMessage("Choose channels");
-        gd.addChoice("PNN cells", channels, channels[2]);
-        gd.addChoice("PV cells", channels, channels[1]);
-        gd.showDialog();
-        ch.add(0, gd.getNextChoice());
-        ch.add(1, gd.getNextChoice());
-        if(gd.wasCanceled())
-            ch = null;
-        return(ch);
-    }
-    
-    
-
     @Override
     public void run(String arg) {
         try {
@@ -128,13 +107,15 @@ public class IHC_PV_PNN implements PlugIn {
             if (imageDir == null) {
                 return;
             }
-            File inDir = new File(imageDir);
-            String[] imageFile = inDir.list();
+            // Find images with lif extension
+            ArrayList<String> imageFile = findImages(imageDir, "lif");
             if (imageFile == null) {
+                IJ.showMessage("Error", "No images found with nd extension");
                 return;
             }
+            
             // create output folder
-            outDirResults = inDir + File.separator+ "Results"+ File.separator;
+            outDirResults = imageDir + File.separator+ "Results"+ File.separator;
             File outDir = new File(outDirResults);
             if (!Files.exists(Paths.get(outDirResults))) {
                 outDir.mkdir();
@@ -147,174 +128,164 @@ public class IHC_PV_PNN implements PlugIn {
             IMetadata meta = service.createOMEXMLMetadata();
             ImageProcessorReader reader = new ImageProcessorReader();
             reader.setMetadataStore(meta);
-            Arrays.sort(imageFile);
-            int imageNum = 0;
-            ArrayList<String> channels = new ArrayList();
+            reader.setId(imageFile.get(0));
+            
+            // Find channel names
+            List<String> channels = findChannels(imageFile.get(0));
+            
+            // Find image calibration
+            Calibration cal = findImageCalib(meta);
+
+            // write headers
+            writeHeaders();
+            
+            // Channels dialog
+            List<String> chs = new ArrayList();
+            List<String> channelsName = new ArrayList();
+            channelsName.add("PNN");
+            channelsName.add("PV");
+            
+            if (channels.size() > 1) {
+                chs = dialog(channels, channelsName);
+                if ( chs == null) {
+                    IJ.showStatus("Plugin cancelled");
+                    return;
+                }
+            }
+            
+            // write headers
+            writeHeaders();
+            
             for (String f : imageFile) {
-                // Find lif files
-                String fileExt = FilenameUtils.getExtension(f);
-                if (fileExt.equals("lif")) {
-                    imageNum++;
-                    rootName = FilenameUtils.getBaseName(f);
-                    String imageName = inDir + File.separator+f;
-                    reader.setId(imageName);
-                    // find channel names
-                    int chs = reader.getSizeC();
-                    String[] ch = new String[chs];
-                    if (chs > 1) {
-                        for (int n = 0; n < chs; n++) 
-                            if (meta.getChannelExcitationWavelength(0, n) == null)
-                                ch[n] = Integer.toString(n);
-                            else 
-                                ch[n] = meta.getChannelExcitationWavelength(0, n).value().toString();
-                    }
-                    if (imageNum == 1) {   
-                        // read image calibration
-                        cal.pixelWidth = meta.getPixelsPhysicalSizeX(0).value().doubleValue();
-                        cal.pixelHeight = cal.pixelWidth;
-                        if (meta.getPixelsPhysicalSizeZ(0) != null)
-                            cal.pixelDepth = meta.getPixelsPhysicalSizeZ(0).value().doubleValue();
-                        else
-                            cal.pixelDepth = 1;
-                        cal.setUnit("microns");
-                        System.out.println("x cal = " +cal.pixelWidth+", z cal=" + cal.pixelDepth);
-                        // dialog
-                        if (chs > 1) {
-                            channels = dialog(ch);
-                            if ( channels == null)
-                                return;
-                        }
-                        
-                        // write headers
-                        writeHeaders();
-                    }
-                    
+                rootName = FilenameUtils.getBaseName(f);
+                // Find roi points file
+                String rootFilename =  imageDir+ File.separator + rootName;
+                String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
+                if (!new File(roiFile).exists())
+                    IJ.showStatus("No roi file found !");
+
+                ImporterOptions options = new ImporterOptions();
+                int series=  reader.getSeriesCount();
+                // for all series
+                for (int s = 0; s < series; s++) {
+                    String seriesName = meta.getImageName(s);
                     // Find xml points file
-                    String rootFilename =  inDir+ File.separator + rootName;
-                    String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
-                    if (!new File(roiFile).exists()) {
-                        IJ.showStatus("No roi file found !");
-                        return;
+                    String xmlFile = imageDir+ File.separator + rootName + "_" + seriesName + ".xml";
+                    if (!new File(xmlFile).exists()) {
+                        IJ.showStatus("No XML file found !") ;
                     }
                     else {
-                        ImporterOptions options = new ImporterOptions();
-                        int series=  reader.getSeriesCount();
-                        // for all series
-                        for (int s = 0; s < series; s++) {
-                            String seriesName = meta.getImageName(s);
-                            // Find xml points file
-                            String xmlFile = inDir+ File.separator + rootName + "_" + seriesName + ".xml";
-                            if (!new File(xmlFile).exists()) {
-                                IJ.showStatus("No XML file found !") ;
-                            }
-                            else {
-                                // Roi
-                                RoiManager rm = new RoiManager(false);
-                                rm.runCommand("Open", roiFile);
-                                
-                                /** 
-                                 * read lif
-                                 * Detect IHC PV cells channel 1, measure intensity
-                                 * compute donut PV Object and measure in PNN channel 2
-                                 * Detect PNN cells measure intensity in PNN channel and find corresponding PV Cell
-                                */
-                                options.setId(imageName);
-                                options.setSplitChannels(true);
-                                options.setQuiet(true);
-                                options.setCrop(true);
-                                options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                                options.setCBegin(s, 1);
-                                options.setCEnd(s, 2);
-                                options.setSeriesOn(s, true);
-                                
-                                
-                                // for all rois
-                                for (int r = 0; r < rm.getCount(); r++) {
-                                    Roi roi = rm.getRoi(r);
-                                    String roiName = roi.getName();
-                                    
-                                    // if roi name contains series name
-                                    // Find crop region
-                                    if (roiName.contains(seriesName)) {
-                                        Rectangle rect = roi.getBounds();
-                                        Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
-                                        options.setCropRegion(s, reg);
-                                        
-                                        
-                                        // Find PNN cells with xml points file
-                                        ArrayList<Point3D> PNNPoints = readXML(xmlFile, roi);
-                                        roi.setLocation(0, 0);
-                                        
-                                        // PNN
-                                        System.out.println("Series : "+seriesName+" ROI : "+roiName);
-                                        System.out.println("Opening PNN channel ...");
-                                        ImagePlus imgPNN = BF.openImagePlus(options)[1];
-                                        // PNN background
-                                        double[] bgPNN = find_background(imgPNN);
-                                        median_filter(imgPNN, 1);
-                                        Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
-                                        System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
-                                        
-                                        //PV
-                                        System.out.println("Opening PV channel ...");
-                                        ImagePlus imgPV = BF.openImagePlus(options)[0];
-                                        //section volume in mm^3
-                                        double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
-                                        // PV background
-                                        double[] bgPV = find_background(imgPV);
-                                        // find PV cells                          
-                                        Objects3DPopulation PVPop = findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
-                                        System.out.println("PV Cells found : " + PVPop.getNbObjects());
-                               
-                                        // save image for objects population
-                                        saveIHCObjects(PVPop, null, PNNPop, imgPV, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
-                                        
-                                        // Compute parameters
+                        // Roi
+                        RoiManager rm = new RoiManager(false);
+                        if (new File(roiFile).exists())
+                            rm.runCommand("Open", roiFile);
+                        else {
+                            rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
+                            rm.getRoi(0).setName(seriesName);
+                        }
 
-                                        // PV
-                                        // create donut
-                                        float dilatedStepXY = (float) (6/cal.pixelWidth);
-                                        float dilatedStepZ = (float) (6/cal.pixelDepth);
-                                        Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
-                                        ImageHandler imhPV = ImageHandler.wrap(imgPV);
-                                        ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
-                                        for (int o = 0; o < PVPop.getNbObjects(); o++) {
-                                            Object3D obj = PVPop.getObject(o);
-                                            Object3D objDonut = PVDonutPop.getObject(o);
-                                            double objVol = obj.getVolumeUnit();
-                                            double objIntPV = obj.getIntegratedDensity(imhPV);
-                                            double objMeanPV = obj.getPixMeanValue(imhPV);
-                                            double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
-                                            PV_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
-                                            PV_Analyze.flush();
-                                        }
-                                        
-                                         // PNN
-                                        for (int o = 0; o < PNNPop.getNbObjects(); o++) {
-                                            Object3D obj = PNNPop.getObject(o);
-                                            double objVol = obj.getVolumeUnit();
-                                            double objIntPNN = obj.getIntegratedDensity(imhPNN);
-                                            // find associated pv cell
-                                            Object3D pvCell = findAssociatedCell(PVPop, obj);
-                                            double objIntPV = 0;
-                                            int pvIndex = -1;
-                                            if (pvCell != null) {
-                                                objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
-                                                pvIndex = PVPop.getIndexOf(pvCell);
-                                            }    
-                                            PNN_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                                    bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+"\n");
-                                            PNN_Analyze.flush();
-                                        }
-                                        closeImages(imgPNN);
-                                        closeImages(imgPV);
-                                    }
+                        /** 
+                         * read lif
+                         * Detect IHC PV cells channel 1, measure intensity
+                         * compute donut PV Object and measure in PNN channel 2
+                         * Detect PNN cells measure intensity in PNN channel and find corresponding PV Cell
+                        */
+                        options.setId(f);
+                        options.setSplitChannels(true);
+                        options.setQuiet(true);
+                        options.setCrop(true);
+                        options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
+                        
+                        options.setSeriesOn(s, true);
+
+
+                        // for all rois
+                        for (int r = 0; r < rm.getCount(); r++) {
+                            Roi roi = rm.getRoi(r);
+                            String roiName = roi.getName();
+
+                            // if roi name contains series name
+                            // Find crop region
+                            if (roiName.contains(seriesName)) {
+                                Rectangle rect = roi.getBounds();
+                                Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
+                                options.setCropRegion(s, reg);
+
+
+                                // Find PNN cells with xml points file
+                                ArrayList<Point3D> PNNPoints = readXML(xmlFile, roi);
+                                roi.setLocation(0, 0);
+
+                                // PNN
+                                System.out.println("Series : "+seriesName+" ROI : "+roiName);
+                                System.out.println("Opening PNN channel ...");
+                                int channel = channels.indexOf(chs.get(0));
+                                ImagePlus imgPNN = BF.openImagePlus(options)[channel];
+                                // PNN background
+                                double[] bgPNN = find_background(imgPNN);
+                                median_filter(imgPNN, 1);
+                                Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
+                                System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
+
+                                //PV
+                                System.out.println("Opening PV channel ...");
+                                channel = channels.indexOf(chs.get(1));
+                                ImagePlus imgPV = BF.openImagePlus(options)[channel];
+                                //section volume in mm^3
+                                double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
+                                // PV background
+                                double[] bgPV = find_background(imgPV);
+                                // find PV cells                          
+                                Objects3DPopulation PVPop = findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
+                                System.out.println("PV Cells found : " + PVPop.getNbObjects());
+
+                                // save image for objects population
+                                saveIHCObjects(PVPop, null, PNNPop, imgPV, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
+
+                                // Compute parameters
+
+                                // PV
+                                // create donut
+                                float dilatedStepXY = (float) (6/cal.pixelWidth);
+                                float dilatedStepZ = (float) (6/cal.pixelDepth);
+                                Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
+                                ImageHandler imhPV = ImageHandler.wrap(imgPV);
+                                ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
+                                for (int o = 0; o < PVPop.getNbObjects(); o++) {
+                                    Object3D obj = PVPop.getObject(o);
+                                    Object3D objDonut = PVDonutPop.getObject(o);
+                                    double objVol = obj.getVolumeUnit();
+                                    double objIntPV = obj.getIntegratedDensity(imhPV);
+                                    double objMeanPV = obj.getPixMeanValue(imhPV);
+                                    double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
+                                    PV_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
+                                            bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
+                                    PV_Analyze.flush();
                                 }
+
+                                 // PNN
+                                for (int o = 0; o < PNNPop.getNbObjects(); o++) {
+                                    Object3D obj = PNNPop.getObject(o);
+                                    double objVol = obj.getVolumeUnit();
+                                    double objIntPNN = obj.getIntegratedDensity(imhPNN);
+                                    // find associated pv cell
+                                    Object3D pvCell = findAssociatedCell(PVPop, obj);
+                                    double objIntPV = 0;
+                                    int pvIndex = -1;
+                                    if (pvCell != null) {
+                                        objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
+                                        pvIndex = PVPop.getIndexOf(pvCell);
+                                    }    
+                                    PNN_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
+                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+"\n");
+                                    PNN_Analyze.flush();
+                                }
+                                closeImages(imgPNN);
+                                closeImages(imgPV);
                             }
-                            options.setSeriesOn(s, false);
                         }
                     }
+                    options.setSeriesOn(s, false);
                 }
             }
             if (PV_Analyze != null) {

@@ -5,6 +5,8 @@ import static Tools.RNAScope_Tools3D.closeImages;
 import static Tools.RNAScope_Tools3D.filterCells;
 import static Tools.RNAScope_Tools3D.findCells;
 import static Tools.RNAScope_Tools3D.findCellsPiriform;
+import static Tools.RNAScope_Tools3D.findImageCalib;
+import static Tools.RNAScope_Tools3D.findImages;
 import static Tools.RNAScope_Tools3D.findRoi;
 import static Tools.RNAScope_Tools3D.find_background;
 import static Tools.RNAScope_Tools3D.maxCellVol;
@@ -19,7 +21,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import loci.common.services.DependencyException;
@@ -31,7 +32,6 @@ import loci.formats.services.OMEXMLService;
 import loci.plugins.BF;
 import loci.plugins.util.ImageProcessorReader;
 import ij.measure.Calibration;
-import ij.plugin.Duplicator;
 import ij.plugin.PlugIn;
 import ij.plugin.frame.RoiManager;
 import java.util.ArrayList;
@@ -59,7 +59,6 @@ public class mRNA_PV implements PlugIn {
     private String imageDir = "";
     public  static String outDirResults = "";
     public  static String rootName = "";
-    public static Calibration cal = new Calibration();
     public static BufferedWriter RNA_PV_Analyze;
 
     
@@ -88,13 +87,14 @@ public class mRNA_PV implements PlugIn {
             if (imageDir == null) {
                 return;
             }
-            File inDir = new File(imageDir);
-            String[] imageFile = inDir.list();
+            // Find images with nd extension
+            ArrayList<String> imageFile = findImages(imageDir, "lif");
             if (imageFile == null) {
+                IJ.showMessage("Error", "No images found with nd extension");
                 return;
             }
             // create output folder
-            outDirResults = inDir + File.separator+ "Results"+ File.separator;
+            outDirResults = imageDir + File.separator+ "Results"+ File.separator;
             File outDir = new File(outDirResults);
             if (!Files.exists(Paths.get(outDirResults))) {
                 outDir.mkdir();
@@ -106,95 +106,77 @@ public class mRNA_PV implements PlugIn {
             IMetadata meta = service.createOMEXMLMetadata();
             ImageProcessorReader reader = new ImageProcessorReader();
             reader.setMetadataStore(meta);
-            Arrays.sort(imageFile);
-            int imageNum = 0;
+            
+            // write headers
+            writeHeaders();
+
+            // Find image calibration
+            Calibration cal = findImageCalib(meta);
+
             for (String f : imageFile) {
-                // Find lif or nd files
-                String fileExt = FilenameUtils.getExtension(f);
-                
-                if (fileExt.equals("lif")) {
-                    imageNum++;
-                    rootName = FilenameUtils.getBaseName(f);
-                    String imageName = inDir + File.separator+f;
-                    reader.setId(imageName);
-                    
-                    if (imageNum == 1) {
-                        // read image calibration
-                        cal.pixelWidth = meta.getPixelsPhysicalSizeX(0).value().doubleValue();
-                        cal.pixelHeight = cal.pixelWidth;
-                        if (meta.getPixelsPhysicalSizeZ(0) != null)
-                            cal.pixelDepth = meta.getPixelsPhysicalSizeZ(0).value().doubleValue();
-                        else
-                            cal.pixelDepth = 1;
-                        cal.setUnit("microns");
-                        System.out.println("x cal = " +cal.pixelWidth+", z cal=" + cal.pixelDepth);
-                        // write headers
-                        writeHeaders();
-                    }
-                    
-                    // find if roi file exist
-                    RoiManager rm = new RoiManager(false);
-                    String roiFileName = inDir + File.separator + rootName + ".zip";
-                    
-                    if (!new File(roiFileName).exists()) {
-                        IJ.showStatus("No roi file found ...");
-                        return;
-                    }
-                    else {
-                        rm.runCommand("Open", roiFileName);
-                        ImporterOptions options = new ImporterOptions();
-                        options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                        options.setId(imageName);
-                        options.setSplitChannels(true);
+                rootName = FilenameUtils.getBaseName(f);
 
-                        // for all series
-                        int series = reader.getSeriesCount();
-                        for (int s = 0; s < series; s++) {
-                            reader.setSeries(s);
-                            options.setSeriesOn(s, true);
-                            options.setCBegin(s, 0);
-                            options.setCEnd(s, 0);
-                            String seriesName = meta.getImageName(s);
+                // find if roi file exist
+                RoiManager rm = new RoiManager(false);
+                String roiFileName = imageDir + File.separator + rootName + ".zip";
 
-                            //Open RNA channel (1)
-                            //Detect RNA PV cells and measure intensity
+                if (!new File(roiFileName).exists()) {
+                    IJ.showStatus("No roi file found ...");
+                }
+                else {
+                    rm.runCommand("Open", roiFileName);
+                    ImporterOptions options = new ImporterOptions();
+                    options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
+                    options.setId(f);
+                    options.setSplitChannels(true);
 
-                            System.out.println("-- Opening RNA channel " + seriesName);
-                            ImagePlus imgRNA = BF.openImagePlus(options)[0];
-                            // Add roi if name contain seriesName crop image
-                            ArrayList<Roi> rois = findRoi(rm, seriesName);
-                            for (Roi roi : rois) {
-                                String roiName = roi.getName();
-                                String layerName = roiName.replace(seriesName, "");
-                                // section volume in mm^3
-                                double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
-                                        * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
-                                double[] bgRNA = find_background(imgRNA);
-                                Objects3DPopulation RNAPop = new Objects3DPopulation();
-                                if (seriesName.contains("Visuel"))
-                                    RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, minCellVol, maxCellVol);
-                                else
-                                    RNAPop = findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
-                                filterCells(RNAPop, 0.45);
-                                System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
-                                ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
-                                for (int o = 0; o < RNAPop.getNbObjects(); o++) {
-                                    Object3D obj = RNAPop.getObject(o);
-                                    double objVol = obj.getVolumeUnit();
-                                    double objInt = obj.getIntegratedDensity(imhRNA);
-                                    if (o == 0)
-                                        RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                            bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
-                                    else 
-                                        RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
-                                    RNA_PV_Analyze.flush();
-                                }
-                                // save image for objects population
-                                saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
+                    // for all series
+                    int series = reader.getSeriesCount();
+                    for (int s = 0; s < series; s++) {
+                        reader.setSeries(s);
+                        options.setSeriesOn(s, true);
+                        options.setCBegin(s, 0);
+                        options.setCEnd(s, 0);
+                        String seriesName = meta.getImageName(s);
+
+                        //Open RNA channel (1)
+                        //Detect RNA PV cells and measure intensity
+
+                        System.out.println("-- Opening RNA channel " + seriesName);
+                        ImagePlus imgRNA = BF.openImagePlus(options)[0];
+                        // Add roi if name contain seriesName crop image
+                        ArrayList<Roi> rois = findRoi(rm, seriesName);
+                        for (Roi roi : rois) {
+                            String roiName = roi.getName();
+                            String layerName = roiName.replace(seriesName, "");
+                            // section volume in mm^3
+                            double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
+                                    * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
+                            double[] bgRNA = find_background(imgRNA);
+                            Objects3DPopulation RNAPop = new Objects3DPopulation();
+                            if (seriesName.contains("Visuel"))
+                                RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, minCellVol, maxCellVol);
+                            else
+                                RNAPop = findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
+                            filterCells(RNAPop, 0.45);
+                            System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
+                            ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
+                            for (int o = 0; o < RNAPop.getNbObjects(); o++) {
+                                Object3D obj = RNAPop.getObject(o);
+                                double objVol = obj.getVolumeUnit();
+                                double objInt = obj.getIntegratedDensity(imhRNA);
+                                if (o == 0)
+                                    RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
+                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
+                                else 
+                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
+                                RNA_PV_Analyze.flush();
                             }
-                            closeImages(imgRNA);
-                            options.setSeriesOn(s, false);
+                            // save image for objects population
+                            saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
                         }
+                        closeImages(imgRNA);
+                        options.setSeriesOn(s, false);
                     }
                 }
             }
