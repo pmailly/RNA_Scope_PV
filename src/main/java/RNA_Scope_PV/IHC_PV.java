@@ -198,7 +198,7 @@ public class IHC_PV implements PlugIn {
                             // Find crop region
                             Rectangle rect = roi.getBounds();
                             Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
-                            options.setCropRegion(0, reg);
+                            options.setCropRegion(s, reg);
                             roi.setLocation(0, 0);
                             
                             //PV

@@ -57,7 +57,7 @@ import org.xml.sax.SAXException;
 public class RNAScope_Tools3D {
     
 
-    public static double minCellVol= 500;
+    public static double minCellVol= 200;
     public static double maxCellVol = 15000;
    
     /**

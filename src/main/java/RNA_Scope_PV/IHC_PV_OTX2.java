@@ -198,6 +198,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                     // Roi
                     RoiManager rm = new RoiManager(false);
                     String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
+                    
                     String roiName = "";
                     if (new File(roiFile).exists())
                         rm.runCommand("Open", roiFile);
@@ -210,10 +211,11 @@ public class IHC_PV_OTX2 implements PlugIn {
                         Roi roi = rm.getRoi(r);
                         roiName = roi.getName();
                         if (roiName.contains(seriesName)) {
+                            System.out.println(roiName + " found ...");
                             // Find crop region
                             Rectangle rect = roi.getBounds();
                             Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
-                            options.setCropRegion(0, reg);
+                            options.setCropRegion(s, reg);
                             roi.setLocation(0, 0);
                             
                             //PV
@@ -237,7 +239,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                             // Otx2 background
                             double[] bgOtx2 = find_background(imgOtx2);
                             // Find Otx2 cells
-                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 10, 12, 1, "Triangle", true, 10, minCellVol, maxCellVol);
+                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 10, 12, 1, "Triangle", false, 10, minCellVol, maxCellVol);
                             filterCells(Otx2Pop, 0.55);
                             System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
 
