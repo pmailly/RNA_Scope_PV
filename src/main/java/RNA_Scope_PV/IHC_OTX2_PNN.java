@@ -5,21 +5,7 @@
  */
 package RNA_Scope_PV;
 
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.createDonutPop;
-import static Tools.RNAScope_Tools3D.dialog;
-import static Tools.RNAScope_Tools3D.findAssociatedCell;
-import static Tools.RNAScope_Tools3D.findChannels;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.findPNNCells;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.median_filter;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.readXML;
-import static Tools.RNAScope_Tools3D.saveIHCObjects;
+
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -65,13 +51,14 @@ public class IHC_OTX2_PNN implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
+    public  String outDirResults = "";
+    public  String rootName = "";
     // threshold to keep OTX2 cells
-    public static double OTX2MinInt;
-    public static double sphCell = 0.5;
-    public static BufferedWriter OTX2_Analyze, PNN_Analyze;
+    public double OTX2MinInt;
+    public double sphCell = 0.5;
+    public BufferedWriter OTX2_Analyze, PNN_Analyze;
     
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     /** initialize result files
      * 
@@ -108,7 +95,7 @@ public class IHC_OTX2_PNN implements PlugIn {
             if (imageDir == null) {
                 return;
             }
-            ArrayList<String> imageFile = findImages(imageDir, "lif");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with lif extension");
                 return;
@@ -131,10 +118,10 @@ public class IHC_OTX2_PNN implements PlugIn {
             reader.setId(imageFile.get(0));
             
             // Find channel names
-            List<String> channels = findChannels(imageFile.get(0));
+            String[] channels = tools.findChannels(imageFile.get(0), meta, reader);
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
             
             // Channels dialog
             List<String> chs = new ArrayList();
@@ -142,8 +129,8 @@ public class IHC_OTX2_PNN implements PlugIn {
             channelsName.add("PNN");
             channelsName.add("OTX2");
             
-            if (channels.size() > 1) {
-                chs = dialog(channels, channelsName);
+            if (channels.length > 1) {
+                chs = tools.dialog(channels, channelsName);
                 if ( chs == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
@@ -155,9 +142,13 @@ public class IHC_OTX2_PNN implements PlugIn {
             
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
-                // Find roi file
-                String rootFilename =  imageDir+ File.separator + rootName;
-                String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
+                // Roi
+                RoiManager rm = new RoiManager(false);
+                String roiFile = new File(rootName + ".zip").exists() ? rootName + ".zip" : rootName + ".roi";
+                // if roi file exists open it else roi = select all
+                if (new File(roiFile).exists())
+                    rm.runCommand("Open", roiFile);
+                
 
                 ImporterOptions options = new ImporterOptions();
                 int series=  reader.getSeriesCount();
@@ -170,13 +161,7 @@ public class IHC_OTX2_PNN implements PlugIn {
                         IJ.showStatus("No XML file found !") ;
                     }
                     else {
-                        // Roi
-                        RoiManager rm = new RoiManager(false);
-                        if (new File(roiFile).exists())
-                            rm.runCommand("Open", roiFile);
-                        else
-                            rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
-
+                        
                         /** 
                          * read lif
                          * Detect IHC OTX2 cells channel 0, measure intensity
@@ -190,7 +175,11 @@ public class IHC_OTX2_PNN implements PlugIn {
                         options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                         options.setSeriesOn(s, true);
 
-
+                        // if no Roi file select all image
+                        if (!new File(roiFile).exists()) {
+                            rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
+                            rm.getRoi(0).setName(seriesName);
+                        }
                         // for all rois
                         for (int r = 0; r < rm.getCount(); r++) {
                             Roi roi = rm.getRoi(r);
@@ -205,34 +194,32 @@ public class IHC_OTX2_PNN implements PlugIn {
 
 
                                 // Find PNN cells with xml points file
-                                ArrayList<Point3D> PNNPoints = readXML(xmlFile, roi);
+                                ArrayList<Point3D> PNNPoints = tools.readXML(xmlFile, roi);
                                 roi.setLocation(0, 0);
 
                                 // PNN
                                 System.out.println("Series : "+seriesName+" ROI : "+roiName);
                                 System.out.println("Opening PNN channel ...");
-                                int channel = channels.indexOf(chs.get(1));
-                                ImagePlus imgPNN = BF.openImagePlus(options)[channel];
+                                ImagePlus imgPNN = BF.openImagePlus(options)[1];
                                 // PNN background
-                                double[] bgPNN = find_background(imgPNN);
-                                median_filter(imgPNN, 1);
-                                Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
+                                double[] bgPNN = tools.find_background(imgPNN);
+                                tools.median_filter(imgPNN, 1);
+                                Objects3DPopulation PNNPop = tools.findPNNCells(imgPNN, roi, PNNPoints);
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
 
                                 //OTX2
                                 System.out.println("Opening OTX2 channel ...");
-                                channel = channels.indexOf(chs.get(0));
-                                ImagePlus imgOTX2 = BF.openImagePlus(options)[channel];
+                                ImagePlus imgOTX2 = BF.openImagePlus(options)[0];
                                 //section volume in mm^3
                                 double sectionVol = (imgOTX2.getWidth() * cal.pixelWidth * imgOTX2.getHeight() * cal.pixelHeight * imgOTX2.getNSlices() * cal.pixelDepth)/1e9;
                                 // OTX2 background
-                                double[] bgOTX2 = find_background(imgOTX2);
+                                double[] bgOTX2 = tools.find_background(imgOTX2);
                                 // find OTX2 cells                          
-                                Objects3DPopulation OTX2Pop = findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
+                                Objects3DPopulation OTX2Pop = tools.findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                                 System.out.println("OTX2 Cells found : " + OTX2Pop.getNbObjects());
 
                                 // save image for objects population
-                                saveIHCObjects(OTX2Pop, null, PNNPop, imgOTX2, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
+                                tools.saveIHCObjects(OTX2Pop, null, PNNPop, imgOTX2, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
 
                                 // Compute parameters
 
@@ -240,7 +227,7 @@ public class IHC_OTX2_PNN implements PlugIn {
                                 // create donut
                                 float dilatedStepXY = (float) (6/cal.pixelWidth);
                                 float dilatedStepZ = (float) (6/cal.pixelDepth);
-                                Objects3DPopulation OTX2DonutPop  = createDonutPop(OTX2Pop, imgOTX2, dilatedStepXY, dilatedStepZ);
+                                Objects3DPopulation OTX2DonutPop  = tools.createDonutPop(OTX2Pop, imgOTX2, dilatedStepXY, dilatedStepZ);
                                 ImageHandler imhOTX2 = ImageHandler.wrap(imgOTX2);
                                 ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
                                 for (int o = 0; o < OTX2Pop.getNbObjects(); o++) {
@@ -261,7 +248,7 @@ public class IHC_OTX2_PNN implements PlugIn {
                                     double objVol = obj.getVolumeUnit();
                                     double objIntPNN = obj.getIntegratedDensity(imhPNN);
                                     // find associated pv cell
-                                    Object3D pvCell = findAssociatedCell(OTX2Pop, obj);
+                                    Object3D pvCell = tools.findAssociatedCell(OTX2Pop, obj);
                                     double objIntOTX2 = 0;
                                     int pvIndex = -1;
                                     if (pvCell != null) {
@@ -272,8 +259,8 @@ public class IHC_OTX2_PNN implements PlugIn {
                                             bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntOTX2+"\n");
                                     PNN_Analyze.flush();
                                 }
-                                closeImages(imgPNN);
-                                closeImages(imgOTX2);
+                                tools.closeImages(imgPNN);
+                                tools.closeImages(imgOTX2);
                             }
                         }
                     }

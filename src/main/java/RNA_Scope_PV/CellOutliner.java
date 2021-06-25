@@ -23,7 +23,7 @@
  * Modified by phm to remove display of mask
  */
 
-package Tools;
+package RNA_Scope_PV;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;

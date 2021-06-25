@@ -5,21 +5,6 @@
  */
 package RNA_Scope_PV;
 
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.createDonutPop;
-import static Tools.RNAScope_Tools3D.dialog;
-import static Tools.RNAScope_Tools3D.findAssociatedCell;
-import static Tools.RNAScope_Tools3D.findChannels;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.findPNNCells;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.median_filter;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.readXML;
-import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -65,13 +50,14 @@ public class IHC_PV_PNN implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
+    public  String outDirResults = "";
+    public  String rootName = "";
     // threshold to keep PV cells
-    public static double PVMinInt;
-    public static double sphCell = 0.5;
-    public static BufferedWriter PV_Analyze, PNN_Analyze;
+    public double PVMinInt;
+    public double sphCell = 0.5;
+    public BufferedWriter PV_Analyze, PNN_Analyze;
     
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     /** initialize result files
      * 
@@ -108,7 +94,7 @@ public class IHC_PV_PNN implements PlugIn {
                 return;
             }
             // Find images with lif extension
-            ArrayList<String> imageFile = findImages(imageDir, "lif");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with nd extension");
                 return;
@@ -131,10 +117,10 @@ public class IHC_PV_PNN implements PlugIn {
             reader.setId(imageFile.get(0));
             
             // Find channel names
-            List<String> channels = findChannels(imageFile.get(0));
+            String[] channels = tools.findChannels(imageFile.get(0),meta,reader);
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             // write headers
             writeHeaders();
@@ -145,8 +131,8 @@ public class IHC_PV_PNN implements PlugIn {
             channelsName.add("PNN");
             channelsName.add("PV");
             
-            if (channels.size() > 1) {
-                chs = dialog(channels, channelsName);
+            if (channels.length > 1) {
+                chs = tools.dialog(channels, channelsName);
                 if ( chs == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
@@ -163,7 +149,11 @@ public class IHC_PV_PNN implements PlugIn {
                 String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
                 if (!new File(roiFile).exists())
                     IJ.showStatus("No roi file found !");
-
+                // Roi
+                RoiManager rm = new RoiManager(false);
+                if (new File(roiFile).exists())
+                    rm.runCommand("Open", roiFile);
+                
                 ImporterOptions options = new ImporterOptions();
                 int series=  reader.getSeriesCount();
                 // for all series
@@ -175,15 +165,7 @@ public class IHC_PV_PNN implements PlugIn {
                         IJ.showStatus("No XML file found !") ;
                     }
                     else {
-                        // Roi
-                        RoiManager rm = new RoiManager(false);
-                        if (new File(roiFile).exists())
-                            rm.runCommand("Open", roiFile);
-                        else {
-                            rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
-                            rm.getRoi(0).setName(seriesName);
-                        }
-
+                        
                         /** 
                          * read lif
                          * Detect IHC PV cells channel 1, measure intensity
@@ -198,7 +180,11 @@ public class IHC_PV_PNN implements PlugIn {
                         
                         options.setSeriesOn(s, true);
 
-
+                        // if no Roi select all image
+                        if (!new File(roiFile).exists()) {
+                            rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
+                            rm.getRoi(0).setName(seriesName);
+                        }
                         // for all rois
                         for (int r = 0; r < rm.getCount(); r++) {
                             Roi roi = rm.getRoi(r);
@@ -213,34 +199,32 @@ public class IHC_PV_PNN implements PlugIn {
 
 
                                 // Find PNN cells with xml points file
-                                ArrayList<Point3D> PNNPoints = readXML(xmlFile, roi);
+                                ArrayList<Point3D> PNNPoints = tools.readXML(xmlFile, roi);
                                 roi.setLocation(0, 0);
 
                                 // PNN
                                 System.out.println("Series : "+seriesName+" ROI : "+roiName);
                                 System.out.println("Opening PNN channel ...");
-                                int channel = channels.indexOf(chs.get(0));
-                                ImagePlus imgPNN = BF.openImagePlus(options)[channel];
+                                ImagePlus imgPNN = BF.openImagePlus(options)[0];
                                 // PNN background
-                                double[] bgPNN = find_background(imgPNN);
-                                median_filter(imgPNN, 1);
-                                Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
+                                double[] bgPNN = tools.find_background(imgPNN);
+                                tools.median_filter(imgPNN, 1);
+                                Objects3DPopulation PNNPop = tools.findPNNCells(imgPNN, roi, PNNPoints);
                                 System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
 
                                 //PV
                                 System.out.println("Opening PV channel ...");
-                                channel = channels.indexOf(chs.get(1));
-                                ImagePlus imgPV = BF.openImagePlus(options)[channel];
+                                ImagePlus imgPV = BF.openImagePlus(options)[1];
                                 //section volume in mm^3
                                 double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                                 // PV background
-                                double[] bgPV = find_background(imgPV);
+                                double[] bgPV = tools.find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
+                                Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                                 // save image for objects population
-                                saveIHCObjects(PVPop, null, PNNPop, imgPV, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
+                                tools.saveIHCObjects(PVPop, null, PNNPop, imgPV, outDirResults+rootName+"-"+seriesName+"_"+roiName+"_IHCObjects.tif");    
 
                                 // Compute parameters
 
@@ -248,7 +232,7 @@ public class IHC_PV_PNN implements PlugIn {
                                 // create donut
                                 float dilatedStepXY = (float) (6/cal.pixelWidth);
                                 float dilatedStepZ = (float) (6/cal.pixelDepth);
-                                Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
+                                Objects3DPopulation PVDonutPop  = tools.createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
                                 ImageHandler imhPV = ImageHandler.wrap(imgPV);
                                 ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
                                 for (int o = 0; o < PVPop.getNbObjects(); o++) {
@@ -269,7 +253,7 @@ public class IHC_PV_PNN implements PlugIn {
                                     double objVol = obj.getVolumeUnit();
                                     double objIntPNN = obj.getIntegratedDensity(imhPNN);
                                     // find associated pv cell
-                                    Object3D pvCell = findAssociatedCell(PVPop, obj);
+                                    Object3D pvCell = tools.findAssociatedCell(PVPop, obj);
                                     double objIntPV = 0;
                                     int pvIndex = -1;
                                     if (pvCell != null) {
@@ -280,8 +264,8 @@ public class IHC_PV_PNN implements PlugIn {
                                             bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+"\n");
                                     PNN_Analyze.flush();
                                 }
-                                closeImages(imgPNN);
-                                closeImages(imgPV);
+                                tools.closeImages(imgPNN);
+                                tools.closeImages(imgPV);
                             }
                         }
                     }

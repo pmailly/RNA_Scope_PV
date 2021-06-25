@@ -1,17 +1,6 @@
 package RNA_Scope_PV;
 
 
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.filterCells;
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.findCellsPiriform;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.findRoi;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.saveRNAObjects;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -57,11 +46,11 @@ public class mRNA_PV implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
-    public static BufferedWriter RNA_PV_Analyze;
+    public  String outDirResults = "";
+    public  String rootName = "";
+    public BufferedWriter RNA_PV_Analyze;
 
-    
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     /** initialize result files
      * 
@@ -88,7 +77,7 @@ public class mRNA_PV implements PlugIn {
                 return;
             }
             // Find images with nd extension
-            ArrayList<String> imageFile = findImages(imageDir, "lif");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with nd extension");
                 return;
@@ -111,7 +100,7 @@ public class mRNA_PV implements PlugIn {
             writeHeaders();
 
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
@@ -145,20 +134,20 @@ public class mRNA_PV implements PlugIn {
                         System.out.println("-- Opening RNA channel " + seriesName);
                         ImagePlus imgRNA = BF.openImagePlus(options)[0];
                         // Add roi if name contain seriesName crop image
-                        ArrayList<Roi> rois = findRoi(rm, seriesName);
+                        ArrayList<Roi> rois = tools.findRoi(rm, seriesName);
                         for (Roi roi : rois) {
                             String roiName = roi.getName();
                             String layerName = roiName.replace(seriesName, "");
                             // section volume in mm^3
                             double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                     * imgRNA.getNSlices() * cal.pixelDepth) / 1e9;
-                            double[] bgRNA = find_background(imgRNA);
+                            double[] bgRNA = tools.find_background(imgRNA);
                             Objects3DPopulation RNAPop = new Objects3DPopulation();
                             if (seriesName.contains("Visuel"))
-                                RNAPop = findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, minCellVol, maxCellVol);
+                                RNAPop = tools.findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                             else
-                                RNAPop = findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
-                            filterCells(RNAPop, 0.45);
+                                RNAPop = tools.findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
+                            tools.filterCells(RNAPop, 0.45);
                             System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                             ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                             for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -173,9 +162,9 @@ public class mRNA_PV implements PlugIn {
                                 RNA_PV_Analyze.flush();
                             }
                             // save image for objects population
-                            saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
+                            tools.saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"-"+layerName+"_RNACells.tif");
                         }
-                        closeImages(imgRNA);
+                        tools.closeImages(imgRNA);
                         options.setSeriesOn(s, false);
                     }
                 }

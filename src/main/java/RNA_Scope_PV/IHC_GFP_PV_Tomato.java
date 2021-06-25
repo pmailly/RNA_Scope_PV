@@ -1,18 +1,6 @@
 package RNA_Scope_PV;
 
 
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.dialog;
-import static Tools.RNAScope_Tools3D.filterCells;
-import static Tools.RNAScope_Tools3D.findAssociatedCell;
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.findChannels;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -59,11 +47,12 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
-    public static double sphCell = 0.5;
-    public static BufferedWriter Tomato_Analyze;
-
+    public  String outDirResults = "";
+    public  String rootName = "";
+    public double sphCell = 0.5;
+    public BufferedWriter Tomato_Analyze, PV_Analyze;
+    
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     
     /** initialize result files
@@ -79,6 +68,14 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                     + "Tomato cell Std background Int\tTomato cell corrected integrated intensity\tTomato Cell corrected integrated intensity in PV channel\tTomato Cell corrected integrated intensity in GFP channel\t"
                     + "PV cell index\tPV cell corrected integrated intensity in PV channel\tGFP cell index\tGFP cell corrected integrated intensity in GFP channel\n");
             Tomato_Analyze.flush();
+            
+            // IHC PV results
+            FileWriter fwPV = new FileWriter(outDirResults + "PV_results.xls",false);
+            PV_Analyze = new BufferedWriter(fwPV);
+            // write results headers
+            PV_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPV Mean Intensity\tPV Integrated intensity\tPV Mean background Int\t"
+                    + "Std backgroun Int\tPV Corrected Integrated intensity\tTomato Corrected Integrated intensity\n");
+            PV_Analyze.flush();
 
     }
     
@@ -97,7 +94,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
             }
             
             // Find images with nd extension
-            ArrayList<String> imageFile = findImages(imageDir, "nd");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "nd");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with nd extension");
                 return;
@@ -119,10 +116,10 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
             reader.setId(imageFile.get(0));
             
             // Find channel names
-            List<String> channels = findChannels(imageFile.get(0));
+            String[] channels = tools.findChannels(imageFile.get(0), meta, reader);
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             // write headers
             writeHeaders();
@@ -133,8 +130,8 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
             channelsName.add("GFP");
             channelsName.add("PV");
             channelsName.add("Tomato");
-            if (channels.size() > 1) {
-                chs = dialog(channels, channelsName);
+            if (channels.length > 1) {
+                chs = tools.dialog(channels, channelsName);
                 if ( chs == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
@@ -183,41 +180,38 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         System.out.println("ROI : "+roiName);
 
                         // Tomato cells
-                        System.out.println("Opening Tomato channel " + channels.get(2) +" ...");
-                        int channel = channels.indexOf(chs.get(2));
-                        ImagePlus imgTomato = BF.openImagePlus(options)[channel];
+                        System.out.println("Opening Tomato channel " + channels[2] +" ...");
+                        ImagePlus imgTomato = BF.openImagePlus(options)[2];
                         // Tomato background
-                        double[] bgTomato = find_background(imgTomato);
+                        double[] bgTomato = tools.find_background(imgTomato);
                         //section volume in mm^3
                         double sectionVol = (imgTomato.getWidth() * cal.pixelWidth * imgTomato.getHeight() * cal.pixelHeight * imgTomato.getNSlices() * cal.pixelDepth)/1e9;
                         // Find Tomato cells
-                        Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Otsu", false, 0, minCellVol, maxCellVol);
-                        filterCells(TomatoPop, 0.55);
+                        Objects3DPopulation TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "Otsu", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                        tools.filterCells(TomatoPop, 0.55);
                         System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 
                         // PV Cells
-                        System.out.println("Opening PV channel " + channels.get(1)+ " ...");
-                        channel = channels.indexOf(chs.get(1));
-                        ImagePlus imgPV = BF.openImagePlus(options)[channel];
+                        System.out.println("Opening PV channel " + channels[1]+ " ...");
+                        ImagePlus imgPV = BF.openImagePlus(options)[1];
                         // PV background
-                        double[] bgPV = find_background(imgPV);
+                        double[] bgPV = tools.find_background(imgPV);
                         // find PV cells                          
-                        Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
+                        Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                         System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                         // GFP cells
-                        System.out.println("Opening GFP channel " + channels.get(0) +" ...");
-                        channel = channels.indexOf(chs.get(0));
-                        ImagePlus imgGFP = BF.openImagePlus(options)[channel];
+                        System.out.println("Opening GFP channel " + channels[0] +" ...");
+                        ImagePlus imgGFP = BF.openImagePlus(options)[0];
                         // GFP background
-                        double[] bgGFP = find_background(imgGFP);
-                        Objects3DPopulation GFPPop = findCells(imgGFP, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, minCellVol, maxCellVol);
+                        double[] bgGFP = tools.find_background(imgGFP);
+                        Objects3DPopulation GFPPop = tools.findCells(imgGFP, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
                         System.out.println("GFP Cells found : " + GFPPop.getNbObjects() + " in " + roiName);
 
 
 
                         // save image for objects population
-                        saveIHCObjects(GFPPop, PVPop, TomatoPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");    
+                        tools.saveIHCObjects(GFPPop, PVPop, TomatoPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");    
 
                         // Compute parameters
 
@@ -230,7 +224,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                             Object3D tomatoCell = TomatoPop.getObject(o);
                             double tomatoCellVol = tomatoCell.getVolumeUnit();
                             // find associated PV cell and integrated intensity
-                            Object3D pvCell = findAssociatedCell(PVPop, tomatoCell);
+                            Object3D pvCell = tools.findAssociatedCell(PVPop, tomatoCell);
                             int pvCellIndex = -1;
                             double pvCellIntChPVCor = 0;
                             if (pvCell != null) {
@@ -238,7 +232,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                                 pvCellIndex = PVPop.getIndexOf(pvCell);
                             }
                             // find associated GFP cell and integrated intensity
-                            Object3D GFPCell = findAssociatedCell(GFPPop, tomatoCell);
+                            Object3D GFPCell = tools.findAssociatedCell(GFPPop, tomatoCell);
                             int GFPCellIndex = -1;
                             double GFPCellIntChGFPCor = 0;
 
@@ -259,9 +253,28 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                                     GFPCellIndex+"\t"+ GFPCellIntChGFPCor+"\n");
                             Tomato_Analyze.flush();
                         }
-                        closeImages(imgGFP);
-                        closeImages(imgTomato);
-                        closeImages(imgPV);
+                        
+                        // PV
+                        // create donut
+                        float dilatedStepXY = (float) (3/cal.pixelWidth);
+                        float dilatedStepZ = 3;
+                        Objects3DPopulation PVDonutPop  = tools.createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
+                        ImageHandler imhOtx2 = ImageHandler.wrap(imgTomato);
+                        for (int o = 0; o < PVPop.getNbObjects(); o++) {
+                            Object3D obj = PVPop.getObject(o);
+                            Object3D objDonut = PVDonutPop.getObject(o);
+                            double objVol = obj.getVolumeUnit();
+                            double objIntPV = obj.getIntegratedDensity(imhPV);
+                            double objMeanPV = obj.getPixMeanValue(imhPV);
+                            double objIntTomato = obj.getIntegratedDensity(imhTomato);
+                            PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
+                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\n");
+                            PV_Analyze.flush();
+                        }
+                        
+                        tools.closeImages(imgGFP);
+                        tools.closeImages(imgTomato);
+                        tools.closeImages(imgPV);
 
                     }
                 }

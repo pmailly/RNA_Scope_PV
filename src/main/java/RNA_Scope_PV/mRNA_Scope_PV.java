@@ -1,19 +1,6 @@
 package RNA_Scope_PV;
 
 
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.createDonutPop;
-import static Tools.RNAScope_Tools3D.findAssociatedCell;
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.findPNNCells;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.readXML;
-import static Tools.RNAScope_Tools3D.saveIHCObjects;
-import static Tools.RNAScope_Tools3D.saveRNAObjects;
 import ij.IJ;
 import ij.ImagePlus;
 import java.io.BufferedWriter;
@@ -63,10 +50,10 @@ public class mRNA_Scope_PV implements PlugIn {
     public  String outDirResults = "";
     public  String rootName = "";
     // threshold to keep PV and Tomato cells
-    public static double PVMinInt, TomatoMinInt;
-    public static double sphCell = 0.5;
+    public double PVMinInt, TomatoMinInt;
+    public double sphCell = 0.5;
 
-
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
            
     @Override
     public void run(String arg) {
@@ -80,7 +67,7 @@ public class mRNA_Scope_PV implements PlugIn {
                 return;
             }
             // Find images with nd extension
-            ArrayList<String> imageFile = findImages(imageDir, "lif");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with nd extension");
                 return;
@@ -136,7 +123,7 @@ public class mRNA_Scope_PV implements PlugIn {
             reader.setId(imageFile.get(0));
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
@@ -173,15 +160,15 @@ public class mRNA_Scope_PV implements PlugIn {
                        options.setCEnd(s, 1);
                        reader.setSeries(s);
                        int sizeZ = reader.getSizeZ();
-                       cal = findImageCalib(meta);
+                       cal = tools.findImageCalib(meta);
                        
                        System.out.println("Open RNA Channel");
                        imgRNA = BF.openImagePlus(options)[0];
                        // section volume in mm^3
                        double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
-                       double[] bgRNA = find_background(imgRNA);
-                       RNAPop = findCells(imgRNA, null, 8, 10, 1, "Li", false, 0, minCellVol, maxCellVol);
+                       double[] bgRNA = tools.find_background(imgRNA);
+                       RNAPop = tools.findCells(imgRNA, null, 8, 10, 1, "Li", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                        System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                        ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                        for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -194,8 +181,8 @@ public class mRNA_Scope_PV implements PlugIn {
                        }
                        options.setSeriesOn(s, false);
                        // save image for objects population
-                        saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"_RNACells.tif");
-                        closeImages(imgRNA);
+                        tools.saveRNAObjects(RNAPop, imgRNA, outDirResults+rootName+"_"+seriesName+"_RNACells.tif");
+                        tools.closeImages(imgRNA);
                     }
                     /** 
                      * Take only series with seriée and condition 1
@@ -209,7 +196,7 @@ public class mRNA_Scope_PV implements PlugIn {
                         System.out.println("-- "+seriesName);
                         reader.setSeries(s);
                        int sizeZ = reader.getSizeZ();
-                       cal = findImageCalib(meta);
+                       cal = tools.findImageCalib(meta);
                        // Find xml points file
                         String xmlFile = imageDir+ File.separator + rootName + " - " + seriesName + ".xml";
                         if (!new File(xmlFile).exists()) {
@@ -227,11 +214,11 @@ public class mRNA_Scope_PV implements PlugIn {
 
                             // Find background
                             System.out.println("PV");
-                            double[] bgPV = find_background(imgPV);
+                            double[] bgPV = tools.find_background(imgPV);
                             System.out.println("Tomato");
-                            double[] bgTomato = find_background(imgTomato);
+                            double[] bgTomato = tools.find_background(imgTomato);
                             System.out.println("PNN");
-                            double[] bgPNN = find_background(imgPNN);
+                            double[] bgPNN = tools.find_background(imgPNN);
 
                             /** 
                              * Find PV, Tomato and PNN objects
@@ -241,14 +228,14 @@ public class mRNA_Scope_PV implements PlugIn {
                             float dilatedStepZ = (float) (6/cal.pixelDepth);
 
                             // PV
-                            PVPop = findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, 0, minCellVol, maxCellVol);
+                            PVPop = tools.findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                             // filter again sphericity and intensity
                             //filtersPVcells(PVPop, bgPV, imgPV);
                             System.out.println("PV Cells found after filter: " + PVPop.getNbObjects());
 
-                            PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
+                            PVDonutPop  = tools.createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
                             ImageHandler imhPV = ImageHandler.wrap(imgPV);
                             ImageHandler imhTomato = ImageHandler.wrap(imgTomato);
                             ImageHandler imhPNN = ImageHandler.wrap(imgPNN);
@@ -266,9 +253,9 @@ public class mRNA_Scope_PV implements PlugIn {
                                 PV_Analyze.flush();
                             }
                             // Tomato
-                            TomatoPop = findCells(imgTomato, null, 8, 10, 1, "Yen", false, 0, minCellVol, maxCellVol);
+                            TomatoPop = tools.findCells(imgTomato, null, 8, 10, 1, "Yen", false, 0, 1,tools.minCellVol, tools.maxCellVol);
                             System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects());
-                            TomatoDonutPop  = createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
+                            TomatoDonutPop  = tools.createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                             for (int o = 0; o < TomatoPop.getNbObjects(); o++) {
                                 Object3D obj = TomatoPop.getObject(o);
                                 Object3D objDonut = TomatoDonutPop.getObject(o);
@@ -282,17 +269,17 @@ public class mRNA_Scope_PV implements PlugIn {
                                 Tomato_Analyze.flush();
                             }
                             // Find PNN cells with xml points file
-                            ArrayList<Point3D> PNNPoints = readXML(xmlFile, null);
-                            PNNPop = findPNNCells(imgPNN, null, PNNPoints);
+                            ArrayList<Point3D> PNNPoints = tools.readXML(xmlFile, null);
+                            PNNPop = tools.findPNNCells(imgPNN, null, PNNPoints);
                             System.out.println("PNN Cells found : " + PNNPop.getNbObjects());
                             for (int o = 0; o < PNNPop.getNbObjects(); o++) {
                                 Object3D obj = PNNPop.getObject(o);
                                 double objVol = obj.getVolumeUnit();
                                 double objIntPNN = obj.getIntegratedDensity(imhPNN);
                                 // find associated pv cell
-                                Object3D pvCell = findAssociatedCell(PVPop, obj);
+                                Object3D pvCell = tools.findAssociatedCell(PVPop, obj);
                                 // find associated tomato cell
-                                Object3D tomatoCell = findAssociatedCell(TomatoPop, obj);
+                                Object3D tomatoCell = tools.findAssociatedCell(TomatoPop, obj);
                                 double objIntPV = 0;
                                 double objIntTomato = 0;
                                 int pvIndex = -1;
@@ -311,11 +298,11 @@ public class mRNA_Scope_PV implements PlugIn {
                                 PNN_Analyze.flush();
                             }
                             // save image for objects population
-                            saveIHCObjects(PVPop, TomatoPop, PNNPop, imgPV, outDirResults+rootName+"_"+seriesName+"_IHCObjects.tif");
+                            tools.saveIHCObjects(PVPop, TomatoPop, PNNPop, imgPV, outDirResults+rootName+"_"+seriesName+"_IHCObjects.tif");
                             options.setSeriesOn(s, false);
-                            closeImages(imgPV);
-                            closeImages(imgTomato);
-                            closeImages(imgPNN);
+                            tools.closeImages(imgPV);
+                            tools.closeImages(imgTomato);
+                            tools.closeImages(imgPNN);
                         }
                     }
                 }

@@ -1,17 +1,6 @@
 package RNA_Scope_PV;
 
 
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.dialog;
-import static Tools.RNAScope_Tools3D.filterCells;
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.findChannels;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.labelsObject;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.minCellVol;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -60,14 +49,14 @@ public class IHC_PV implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
+    public  String outDirResults = "";
+    public  String rootName = "";
     // threshold to keep PV and Otx2 cells
-    public static double PVMinInt, Otx2MinInt;
-    public static double sphCell = 0.5;
-    public static BufferedWriter PV_Analyze;
+    public double PVMinInt, Otx2MinInt;
+    public double sphCell = 0.5;
+    public BufferedWriter PV_Analyze;
 
-    
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     /** initialize result files
      * 
@@ -84,13 +73,13 @@ public class IHC_PV implements PlugIn {
 
     }
     
-    public static void saveIHCObjects(Objects3DPopulation PVPop, ImagePlus imgCells, String name) {
+    public void saveIHCObjects(Objects3DPopulation PVPop, ImagePlus imgCells, String name) {
        // PVPop blue Otx2Pop/Tomato red PNNPop green
         ImageHandler pvImgObj = ImageHandler.wrap(imgCells).createSameDimensions();
         // draw obj population
         if (PVPop != null) {
             PVPop.draw(pvImgObj, 64);
-            labelsObject(PVPop, pvImgObj.getImagePlus());
+            tools.labelsObject(PVPop, pvImgObj.getImagePlus());
         }
        
         ImagePlus[] imgColors = {null, pvImgObj.getImagePlus(), null, imgCells};
@@ -113,7 +102,7 @@ public class IHC_PV implements PlugIn {
                 return;
             }
             // Find images with nd extension
-            ArrayList<String> imageFile = findImages(imageDir, "lif");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with lif extension");
                 return;
@@ -138,10 +127,10 @@ public class IHC_PV implements PlugIn {
             writeHeaders();
             
             // Find channel names
-            List<String> channels = findChannels(imageFile.get(0));
+            String[] channels = tools.findChannels(imageFile.get(0), meta, reader);
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             // write headers
             writeHeaders();
@@ -151,8 +140,8 @@ public class IHC_PV implements PlugIn {
             List<String> channelsName = new ArrayList();
             channelsName.add("PV");
             
-            if (channels.size() > 1) {
-                chs = dialog(channels, channelsName);
+            if (channels.length > 1) {
+                chs = tools.dialog(channels, channelsName);
                 if ( chs == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
@@ -168,7 +157,15 @@ public class IHC_PV implements PlugIn {
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);  
                 ImporterOptions options = new ImporterOptions();
+                
+                 // Roi
                 String rootFilename =  imageDir+ File.separator + rootName;
+                RoiManager rm = new RoiManager(false);
+                String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
+                
+                if (new File(roiFile).exists())
+                    rm.runCommand("Open", roiFile);
+                
                 int series=  reader.getSeriesCount();
                 // for all series
                 for (int s = 0; s < series; s++) {
@@ -180,38 +177,32 @@ public class IHC_PV implements PlugIn {
                     String seriesName = meta.getImageName(s);
                     options.setSeriesOn(s, true);
                     
-                    // Roi
-                    RoiManager rm = new RoiManager(false);
-                    String roiFile = new File(rootFilename + ".zip").exists() ? rootFilename + ".zip" : rootFilename + ".roi";
-                    String roiName = "";
-                    if (new File(roiFile).exists())
-                        rm.runCommand("Open", roiFile);
-                    else {
+                   // if no Roi select all image
+                    if (!new File(roiFile).exists()) {
                         rm.add(new Roi(0, 0, reader.getSizeX(), reader.getSizeY()),0);
                         rm.getRoi(0).setName(seriesName);
                     }
                     // for all rois
                     for (int r = 0; r < rm.getCount(); r++) {
                         Roi roi = rm.getRoi(r);
-                        roiName = roi.getName();
+                        String roiName = roi.getName();
                         if (roiName.contains(seriesName)) {
                             // Find crop region
                             Rectangle rect = roi.getBounds();
                             Region reg = new Region(rect.x, rect.y, rect.width, rect.height);
-                            options.setCropRegion(0, reg);
+                            options.setCropRegion(s, reg);
                             roi.setLocation(0, 0);
                             
                             //PV
                             System.out.println("Opening PV channel ...");
-                            int channel = channels.indexOf(chs.get(0));
-                            ImagePlus imgPV = BF.openImagePlus(options)[channel];
+                            ImagePlus imgPV = BF.openImagePlus(options)[0];
                             
                             //section volume in mm^3
                             double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                             // PV background
-                            double[] bgPV = find_background(imgPV);
+                            double[] bgPV = tools.find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, minCellVol, maxCellVol);
+                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             // save image for objects population
@@ -220,9 +211,6 @@ public class IHC_PV implements PlugIn {
                             // Compute parameters
 
                             // PV
-                            // create donut
-                            float dilatedStepXY = (float) (6/cal.pixelWidth);
-                            float dilatedStepZ = (float) (6/cal.pixelDepth);
                             ImageHandler imhPV = ImageHandler.wrap(imgPV);
                             for (int o = 0; o < PVPop.getNbObjects(); o++) {
                                 Object3D obj = PVPop.getObject(o);
@@ -234,7 +222,7 @@ public class IHC_PV implements PlugIn {
                                 PV_Analyze.flush();
                             }
 
-                            closeImages(imgPV);
+                            tools.closeImages(imgPV);
                         }
                     }
                     options.setSeriesOn(s, false);

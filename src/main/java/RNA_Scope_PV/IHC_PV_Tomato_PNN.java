@@ -1,28 +1,10 @@
 package RNA_Scope_PV;
 
 
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.PNN_Analyze;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.PV_Analyze;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.outDirResults;
-import static RNA_Scope_PV.IHC_PV_OTX2_PNN.rootName;
-import static Tools.RNAScope_Tools3D.closeImages;
-import static Tools.RNAScope_Tools3D.createDonutPop;
-import static Tools.RNAScope_Tools3D.dialog;
-import static Tools.RNAScope_Tools3D.filterCells;
-import static Tools.RNAScope_Tools3D.findAssociatedCell;
-import static Tools.RNAScope_Tools3D.findCells;
-import static Tools.RNAScope_Tools3D.findChannels;
-import static Tools.RNAScope_Tools3D.findImageCalib;
-import static Tools.RNAScope_Tools3D.findImages;
-import static Tools.RNAScope_Tools3D.findPNNCells;
-import static Tools.RNAScope_Tools3D.find_background;
-import static Tools.RNAScope_Tools3D.maxCellVol;
-import static Tools.RNAScope_Tools3D.minCellVol;
-import static Tools.RNAScope_Tools3D.readXML;
-import static Tools.RNAScope_Tools3D.saveIHCObjects;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -69,14 +51,14 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
     
     private final boolean canceled = false;
     private String imageDir = "";
-    public  static String outDirResults = "";
-    public  static String rootName = "";
+    public  String outDirResults = "";
+    public  String rootName = "";
     // threshold to keep PV and Tomato cells
-    public static double PVMinInt, TomatoMinInt;
-    public static double sphCell = 0.5;
-    public static BufferedWriter PV_Analyze, Tomato_Analyze, PNN_Analyze;
+    public double PVMinInt, TomatoMinInt;
+    public double sphCell = 0.5;
+    public BufferedWriter PV_Analyze, Tomato_Analyze, PNN_Analyze;
 
-    
+    private RNAScope_Tools3D tools = new RNAScope_Tools3D();
     
     /** initialize result files
      * 
@@ -88,7 +70,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                 PV_Analyze = new BufferedWriter(fwPV);
                 // write results headers
                 PV_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPV Mean Intensity\tPV Integrated intensity\tPV Mean background Int\t"
-                        + "Std backgroun Int\tPV Corrected Integrated intensity\tOtx2 Corrected Integrated intensity\tPNN Corrected Integrated intensity\n");
+                        + "Std backgroun Int\tPV Corrected Integrated intensity\tTomato Corrected Integrated intensity\tPNN Corrected Integrated intensity\n");
                 PV_Analyze.flush();
                 
              // IHC PNN results
@@ -96,7 +78,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                 PNN_Analyze = new BufferedWriter(fwPNN);
                 // write results headers
                 PNN_Analyze.write("Image Name\tLayer name\tSection Volume(mm^3)\tCell density (/mm^3)\t#Cell\tCell Vol\tPNN Integrated intensity\tPNN Mean background Int\t"
-                        + "Std background Int\tPNN Corrected Integrated intensity\t#PV Cell\tPV Corrected Integrated intensity\t#Otx2 Cell\tOtx2 Corrected Integrated intensity\n");
+                        + "Std background Int\tPNN Corrected Integrated intensity\t#PV Cell\tPV Corrected Integrated intensity\t#Tomato Cell\tTomato Corrected Integrated intensity\n");
                 PNN_Analyze.flush();    
 
             // IHC Tomato results
@@ -125,7 +107,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                 return;
             }
             // Find images with nd extension
-            ArrayList<String> imageFile = findImages(imageDir, "nd");
+            ArrayList<String> imageFile = tools.findImages(imageDir, "nd");
             if (imageFile == null) {
                 IJ.showMessage("Error", "No images found with nd extension");
                 return;
@@ -147,10 +129,10 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
             reader.setId(imageFile.get(0));
             
             // Find channel names
-            List<String> channels = findChannels(imageFile.get(0));
+            String[] channels = tools.findChannels(imageFile.get(0), meta, reader);
             
             // Find image calibration
-            Calibration cal = findImageCalib(meta);
+            Calibration cal = tools.findImageCalib(meta);
 
             // write headers
             writeHeaders();
@@ -161,8 +143,8 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
             channelsName.add("Tomato");
             channelsName.add("PNN");
             channelsName.add("PV");
-            if (channels.size() > 1) {
-                chs = dialog(channels, channelsName);
+            if (channels.length > 1) {
+                chs = tools.dialog(channels, channelsName);
                 if ( chs == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
@@ -218,58 +200,43 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                             options.setCropRegion(0, reg);
 
                             // Find PNN cells with xml points file
-                            ArrayList<Point3D> PNNPoints = readXML(xmlFile, roi);
+                            ArrayList<Point3D> PNNPoints = tools.readXML(xmlFile, roi);
                             roi.setLocation(0, 0);
 
                             // PNN
                             System.out.println("ROI : "+roiName);
-                            System.out.println("Opening PNN channel " + channels.get(1) +" ...");
-                            int channel = channels.indexOf(chs.get(1));
-                            ImagePlus imgPNN = BF.openImagePlus(options)[channel];
+                            System.out.println("Opening PNN channel " + channels[1] +" ...");
+                            ImagePlus imgPNN = BF.openImagePlus(options)[1];
                             // PNN background
-                            double[] bgPNN = find_background(imgPNN);
-                            Objects3DPopulation PNNPop = findPNNCells(imgPNN, roi, PNNPoints);
+                            double[] bgPNN = tools.find_background(imgPNN);
+                            Objects3DPopulation PNNPop = tools.findPNNCells(imgPNN, roi, PNNPoints);
                             System.out.println("PNN Cells found : " + PNNPop.getNbObjects() + " in " + roiName);
 
                             //PV
-                            System.out.println("Opening PV channel " + channels.get(2)+ " ...");
-                            channel = channels.indexOf(chs.get(2));
-                            ImagePlus imgPV = BF.openImagePlus(options)[channel];
+                            System.out.println("Opening PV channel " + channels[3]+ " ...");
+                            ImagePlus imgPV = BF.openImagePlus(options)[3];
                             //section volume in mm^3
                             double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                             // PV background
-                            double[] bgPV = find_background(imgPV);
+                            double[] bgPV = tools.find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, minCellVol, maxCellVol);
+                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             //Tomato
-                            System.out.println("Opening Tomato channel " + channels.get(0) +" ...");
-                            channel = channels.indexOf(chs.get(0));
-                            ImagePlus imgTomato = BF.openImagePlus(options)[channel];
+                            System.out.println("Opening Tomato channel " + channels[2] +" ...");
+                            ImagePlus imgTomato = BF.openImagePlus(options)[2];
+                            
                             // Tomato background
-                            double[] bgTomato = find_background(imgTomato);
+                            double[] bgTomato = tools.find_background(imgTomato);
                             // Find Tomato cells
-                            Objects3DPopulation TomatoPop = findCells(imgTomato, roi, 18, 20, 1, "Triangle", true, 20, 3, minCellVol, maxCellVol);
-                            filterCells(TomatoPop, 0.55);
+                            Objects3DPopulation TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 3, tools.minCellVol, tools.maxCellVol);
+                            tools.filterCells(TomatoPop, 0.55);
                             System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 
                             // save image for objects population
-                            saveIHCObjects(PVPop, TomatoPop, PNNPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");  
+                            tools.saveIHCObjects(PVPop, TomatoPop, PNNPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");  
                             
-                            //Otx2
-                            System.out.println("Opening Otx2 channel ...");
-                            channel = channels.indexOf(chs.get(0));
-                            ImagePlus imgOtx2 = BF.openImagePlus(options)[channel];
-                            // Otx2 background
-                            double[] bgOtx2 = find_background(imgOtx2);
-                            // Find Otx2 cells
-                            Objects3DPopulation Otx2Pop = findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, 10, 1,minCellVol, maxCellVol);
-                            filterCells(Otx2Pop, 0.55);
-                            System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
-
-                            // save image for objects population
-                            saveIHCObjects(PVPop, TomatoPop, PNNPop, imgPV, outDirResults+rootName+"-"+roiName+"_IHCObjects.tif");  
 
 
                             // Compute parameters
@@ -284,29 +251,28 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
 
                             // PV
                         
-                            Objects3DPopulation PVDonutPop  = createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
-                            ImageHandler imhOtx2 = ImageHandler.wrap(imgOtx2);
+                            Objects3DPopulation PVDonutPop  = tools.createDonutPop(PVPop, imgPV, dilatedStepXY, dilatedStepZ);
                             for (int o = 0; o < PVPop.getNbObjects(); o++) {
                                 Object3D obj = PVPop.getObject(o);
                                 Object3D objDonut = PVDonutPop.getObject(o);
                                 double objVol = obj.getVolumeUnit();
                                 double objIntPV = obj.getIntegratedDensity(imhPV);
                                 double objMeanPV = obj.getPixMeanValue(imhPV);
-                                double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
+                                double objIntTomato = obj.getIntegratedDensity(imhTomato);
                                 double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\t"+
                                         (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                                 PV_Analyze.flush();
                             }
                             
                             // Tomato
-                            Objects3DPopulation TomatoDonutPop  = createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
+                            Objects3DPopulation TomatoDonutPop  = tools.createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                             for (int o = 0; o < TomatoPop.getNbObjects(); o++) {
                                 Object3D tomatoCell = TomatoPop.getObject(o);
                                 double tomatoCellVol = tomatoCell.getVolumeUnit();
                                 // find associated PV cell and integrated intensity
-                                Object3D pvCell = findAssociatedCell(PVPop, tomatoCell);
+                                Object3D pvCell = tools.findAssociatedCell(PVPop, tomatoCell);
                                 int pvCellIndex = -1;
                                 double pvCellIntChPVCor = 0;
                                 if (pvCell != null) {
@@ -314,7 +280,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                     pvCellIndex = PVPop.getIndexOf(pvCell);
                                 }
                                 // find associated PNN cell and integrated intensity
-                                Object3D pnnCell = findAssociatedCell(PNNPop, tomatoCell);
+                                Object3D pnnCell = tools.findAssociatedCell(PNNPop, tomatoCell);
                                 int pnnCellIndex = -1;
                                 double pnnCellIntChPNNCor = 0;
 
@@ -343,29 +309,29 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 double objVol = obj.getVolumeUnit();
                                 double objIntPNN = obj.getIntegratedDensity(imhPNN);
                                 // find associated pv cell
-                                Object3D pvCell = findAssociatedCell(PVPop, obj);
-                                // find associated Otx2 cell
-                                Object3D Otx2Cell = findAssociatedCell(Otx2Pop, obj);
+                                Object3D pvCell = tools.findAssociatedCell(PVPop, obj);
+                                // find associated Tomato cell
+                                Object3D TomatoCell = tools.findAssociatedCell(TomatoPop, obj);
                                 double objIntPV = 0;
-                                double objIntOtx2 = 0;
+                                double objIntTomato = 0;
                                 int pvIndex = -1;
-                                int Otx2Index = -1;
+                                int TomatoIndex = -1;
                                 if (pvCell != null) {
                                     objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                                     pvIndex = PVPop.getIndexOf(pvCell);
                                 }    
-                                if (Otx2Cell != null) {
-                                    objIntOtx2 = Otx2Cell.getIntegratedDensity(imhOtx2) - bgOtx2[0] * (Otx2Cell.getVolumePixels());
-                                    Otx2Index = Otx2Pop.getIndexOf(Otx2Cell);
+                                if (TomatoCell != null) {
+                                    objIntTomato = TomatoCell.getIntegratedDensity(imhTomato) - bgTomato[0] * (TomatoCell.getVolumePixels());
+                                    TomatoIndex = TomatoPop.getIndexOf(TomatoCell);
                                 }
                                 PNN_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
                                         bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+
-                                        "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
+                                        "\t"+TomatoIndex+"\t"+objIntTomato+"\n");
                                 PNN_Analyze.flush();
                             }
-                            closeImages(imgPNN);
-                            closeImages(imgTomato);
-                            closeImages(imgPV);
+                            tools.closeImages(imgPNN);
+                            tools.closeImages(imgTomato);
+                            tools.closeImages(imgPV);
                         }
 
                     }
