@@ -41,6 +41,7 @@ import mcib3d.image3d.ImageHandler;
 import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -148,9 +149,7 @@ public class RNAScope_Tools3D {
      * @return 
      */
     
-    public ArrayList dialog(String[] channels, List<String> channelsName) {
-        ArrayList ch = new ArrayList();
-        
+    public int[] dialog(String[] channels, List<String> channelsName) {
         GenericDialogPlus gd = new GenericDialogPlus("IHC parameters");
         gd.setInsets(0, 10, 0);
         gd.addImage(icon);
@@ -161,11 +160,13 @@ public class RNAScope_Tools3D {
             index++;
         }
         gd.showDialog();
-        for (int i = 0; i < index; i++)
-            ch.add(i, gd.getNextChoice());
+        int[] chChoices = new int[channels.length];
+        for (int n = 0; n < chChoices.length; n++) {
+            chChoices[n] = ArrayUtils.indexOf(channels, gd.getNextChoice());
+        }
         if(gd.wasCanceled())
-            ch = null;
-        return(ch);
+            chChoices = null;
+        return(chChoices);
     }
     
     

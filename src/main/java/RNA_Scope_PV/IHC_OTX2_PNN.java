@@ -124,14 +124,14 @@ public class IHC_OTX2_PNN implements PlugIn {
             Calibration cal = tools.findImageCalib(meta);
             
             // Channels dialog
-            List<String> chs = new ArrayList();
+            int[] channelIndex = new int[channels.length];
             List<String> channelsName = new ArrayList();
             channelsName.add("PNN");
             channelsName.add("OTX2");
             
             if (channels.length > 1) {
-                chs = tools.dialog(channels, channelsName);
-                if ( chs == null) {
+                channelIndex = tools.dialog(channels, channelsName);
+                if (channelIndex == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
                 }
@@ -200,7 +200,9 @@ public class IHC_OTX2_PNN implements PlugIn {
                                 // PNN
                                 System.out.println("Series : "+seriesName+" ROI : "+roiName);
                                 System.out.println("Opening PNN channel ...");
-                                ImagePlus imgPNN = BF.openImagePlus(options)[1];
+                                options.setCBegin(0, channelIndex[0]);
+                                options.setCEnd(0, channelIndex[0]); 
+                                ImagePlus imgPNN = BF.openImagePlus(options)[0];
                                 // PNN background
                                 double[] bgPNN = tools.find_background(imgPNN);
                                 tools.median_filter(imgPNN, 1);
@@ -209,6 +211,8 @@ public class IHC_OTX2_PNN implements PlugIn {
 
                                 //OTX2
                                 System.out.println("Opening OTX2 channel ...");
+                                options.setCBegin(0, channelIndex[1]);
+                                options.setCEnd(0, channelIndex[1]); 
                                 ImagePlus imgOTX2 = BF.openImagePlus(options)[0];
                                 //section volume in mm^3
                                 double sectionVol = (imgOTX2.getWidth() * cal.pixelWidth * imgOTX2.getHeight() * cal.pixelHeight * imgOTX2.getNSlices() * cal.pixelDepth)/1e9;

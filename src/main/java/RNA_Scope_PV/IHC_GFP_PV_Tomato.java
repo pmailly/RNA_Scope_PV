@@ -125,14 +125,14 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
             writeHeaders();
             
             // Channels dialog
-            List<String> chs = new ArrayList();
+            int[] channelIndex = new int[channels.length];
             List<String> channelsName = new ArrayList();
             channelsName.add("GFP");
             channelsName.add("PV");
             channelsName.add("Tomato");
             if (channels.length > 1) {
-                chs = tools.dialog(channels, channelsName);
-                if ( chs == null) {
+                channelIndex = tools.dialog(channels, channelsName);
+                if ( channelIndex == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
                 }
@@ -180,8 +180,10 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         System.out.println("ROI : "+roiName);
 
                         // Tomato cells
-                        System.out.println("Opening Tomato channel " + channels[2] +" ...");
-                        ImagePlus imgTomato = BF.openImagePlus(options)[2];
+                        System.out.println("Opening Tomato channel ...");
+                        options.setCBegin(0, channelIndex[2]);
+                        options.setCEnd(0, channelIndex[2]); 
+                        ImagePlus imgTomato = BF.openImagePlus(options)[0];
                         // Tomato background
                         double[] bgTomato = tools.find_background(imgTomato);
                         //section volume in mm^3
@@ -192,8 +194,10 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 
                         // PV Cells
-                        System.out.println("Opening PV channel " + channels[1]+ " ...");
-                        ImagePlus imgPV = BF.openImagePlus(options)[1];
+                        System.out.println("Opening PV channel  ...");
+                        options.setCBegin(0, channelIndex[1]);
+                        options.setCEnd(0, channelIndex[1]);
+                        ImagePlus imgPV = BF.openImagePlus(options)[0];
                         // PV background
                         double[] bgPV = tools.find_background(imgPV);
                         // find PV cells                          
@@ -201,7 +205,9 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                         // GFP cells
-                        System.out.println("Opening GFP channel " + channels[0] +" ...");
+                        System.out.println("Opening GFP channel ...");
+                        options.setCBegin(0, channelIndex[0]);
+                        options.setCEnd(0, channelIndex[0]); 
                         ImagePlus imgGFP = BF.openImagePlus(options)[0];
                         // GFP background
                         double[] bgGFP = tools.find_background(imgGFP);

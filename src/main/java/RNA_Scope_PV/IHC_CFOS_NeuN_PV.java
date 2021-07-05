@@ -129,14 +129,14 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
             writeHeaders();
             
             // Channels dialog
-            List<String> chs = new ArrayList();
+            int[] channelIndex = new int[channels.length];
             List<String> channelsName = new ArrayList();
             channelsName.add("Cfos");
             channelsName.add("NeuN");
             channelsName.add("PV");
             if (channels.length > 1) {
-                chs = tools.dialog(channels, channelsName);
-                if ( chs == null) {
+                channelIndex = tools.dialog(channels, channelsName);
+                if ( channelIndex == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
                 }
@@ -157,11 +157,12 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 options.setQuiet(true);
                 options.setCrop(true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-
+                options.setCBegin(0, channelIndex[0]);
+                options.setCEnd(0, channelIndex[0]); 
 
                 // Cfos cells
                 System.out.println("Opening Cfos channel  ...");
-                ImagePlus imgCfos = BF.openImagePlus(options)[1];
+                ImagePlus imgCfos = BF.openImagePlus(options)[0];
                 // Cfos background
                 double[] bgCfos = tools.find_background(imgCfos);
                 //section volume in mm^3
@@ -173,7 +174,9 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
 
                 // PV Cells
                 System.out.println("Opening PV channel ...");
-                ImagePlus imgPV = BF.openImagePlus(options)[3];
+                options.setCBegin(0, channelIndex[2]);
+                options.setCEnd(0, channelIndex[2]); 
+                ImagePlus imgPV = BF.openImagePlus(options)[0];
                 // PV background
                 double[] bgPV = tools.find_background(imgPV);
                 // find PV cells                          
@@ -182,7 +185,9 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
 
                 // NeuN cells
                 System.out.println("Opening NeuN channel  ...");
-                ImagePlus imgNeuN = BF.openImagePlus(options)[2];
+                options.setCBegin(0, channelIndex[1]);
+                options.setCEnd(0, channelIndex[1]); 
+                ImagePlus imgNeuN = BF.openImagePlus(options)[0];
                 // NeuN background
                 double[] bgNeuN = tools.find_background(imgNeuN);
                 Objects3DPopulation NeuNPop = tools.findNeuNCells(imgNeuN);

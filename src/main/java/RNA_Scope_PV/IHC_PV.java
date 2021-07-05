@@ -125,28 +125,13 @@ public class IHC_PV implements PlugIn {
             
             // write headers
             writeHeaders();
-            
-            // Find channel names
-            String[] channels = tools.findChannels(imageFile.get(0), meta, reader);
-            
+                        
             // Find image calibration
             Calibration cal = tools.findImageCalib(meta);
 
             // write headers
             writeHeaders();
             
-            // Channels dialog
-            List<String> chs = new ArrayList();
-            List<String> channelsName = new ArrayList();
-            channelsName.add("PV");
-            
-            if (channels.length > 1) {
-                chs = tools.dialog(channels, channelsName);
-                if ( chs == null) {
-                    IJ.showStatus("Plugin cancelled");
-                    return;
-                }
-            }
             
              /** 
              * 

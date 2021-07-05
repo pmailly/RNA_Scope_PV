@@ -126,14 +126,14 @@ public class IHC_PV_PNN implements PlugIn {
             writeHeaders();
             
             // Channels dialog
-            List<String> chs = new ArrayList();
+            int[] channelIndex = new int[channels.length];
             List<String> channelsName = new ArrayList();
             channelsName.add("PNN");
             channelsName.add("PV");
             
             if (channels.length > 1) {
-                chs = tools.dialog(channels, channelsName);
-                if ( chs == null) {
+                channelIndex = tools.dialog(channels, channelsName);
+                if ( channelIndex == null) {
                     IJ.showStatus("Plugin cancelled");
                     return;
                 }
@@ -205,6 +205,8 @@ public class IHC_PV_PNN implements PlugIn {
                                 // PNN
                                 System.out.println("Series : "+seriesName+" ROI : "+roiName);
                                 System.out.println("Opening PNN channel ...");
+                                options.setCBegin(0, channelIndex[0]);
+                                options.setCEnd(0, channelIndex[0]); 
                                 ImagePlus imgPNN = BF.openImagePlus(options)[0];
                                 // PNN background
                                 double[] bgPNN = tools.find_background(imgPNN);
@@ -214,7 +216,9 @@ public class IHC_PV_PNN implements PlugIn {
 
                                 //PV
                                 System.out.println("Opening PV channel ...");
-                                ImagePlus imgPV = BF.openImagePlus(options)[1];
+                                options.setCBegin(0, channelIndex[1]);
+                                options.setCEnd(0, channelIndex[1]); 
+                                ImagePlus imgPV = BF.openImagePlus(options)[0];
                                 //section volume in mm^3
                                 double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                                 // PV background
