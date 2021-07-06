@@ -160,7 +160,7 @@ public class RNAScope_Tools3D {
             index++;
         }
         gd.showDialog();
-        int[] chChoices = new int[channels.length];
+        int[] chChoices = new int[channelsName.size()];
         for (int n = 0; n < chChoices.length; n++) {
             chChoices[n] = ArrayUtils.indexOf(channels, gd.getNextChoice());
         }
