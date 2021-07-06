@@ -176,19 +176,26 @@ public class RNAScope_Tools3D {
     public ArrayList findImages(String imagesFolder, String imageExt) {
         File inDir = new File(imagesFolder);
         String[] files = inDir.list();
+        ArrayList<String> images = new ArrayList();
         if (files == null) {
             System.out.println("No Image found in "+imagesFolder);
             return null;
         }
-        ArrayList<String> images = new ArrayList();
-        for (String f : files) {
-            // Find images with extension
-            String fileExt = FilenameUtils.getExtension(f);
-            if (fileExt.equals(imageExt))
-                images.add(imagesFolder + File.separator + f);
+        else {
+            
+            for (String f : files) {
+                // Find images with extension
+                String fileExt = FilenameUtils.getExtension(f);
+                if (fileExt.equals(imageExt))
+                    images.add(imagesFolder + File.separator + f);
+            }
+            Collections.sort(images);
+            if (!images.isEmpty())
+                return(images);
+            else
+                return(null);
+            
         }
-        Collections.sort(images);
-        return(images);
     }
     
      /**
