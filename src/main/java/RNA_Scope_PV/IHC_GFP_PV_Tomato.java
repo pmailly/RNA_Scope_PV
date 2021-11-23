@@ -84,6 +84,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
@@ -234,7 +235,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                             int pvCellIndex = -1;
                             double pvCellIntChPVCor = 0;
                             if (pvCell != null) {
-                                pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
+                                pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
                                 pvCellIndex = PVPop.getIndexOf(pvCell);
                             }
                             // find associated GFP cell and integrated intensity
@@ -243,14 +244,14 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                             double GFPCellIntChGFPCor = 0;
 
                             if (GFPCell != null) {
-                                GFPCellIntChGFPCor = GFPCell.getIntegratedDensity(imhGFP) - (bgGFP[0] * GFPCell.getVolumePixels());
+                                GFPCellIntChGFPCor = GFPCell.getIntegratedDensity(imhGFP) - (bgGFP[0] * GFPCell.getVolumeUnit());
                                 GFPCellIndex = GFPPop.getIndexOf(GFPCell);
                             }
                             // Find tomato integrated intensity in PV and GFP channel
                             double tomatoCellIntChTomato = tomatoCell.getIntegratedDensity(imhTomato);
-                            double tomatoCellIntChTomatoCor = tomatoCellIntChTomato - (bgTomato[0] * tomatoCell.getVolumePixels());
-                            double tomatoCellIntChPVCor = tomatoCell.getIntegratedDensity(imhPV) - (bgPV[0] * tomatoCell.getVolumePixels());
-                            double tomatoCellIntChGFPCor = tomatoCell.getIntegratedDensity(imhGFP) - (bgGFP[0] * tomatoCell.getVolumePixels());
+                            double tomatoCellIntChTomatoCor = tomatoCellIntChTomato - (bgTomato[0] * tomatoCell.getVolumeUnit());
+                            double tomatoCellIntChPVCor = tomatoCell.getIntegratedDensity(imhPV) - (bgPV[0] * tomatoCell.getVolumeUnit());
+                            double tomatoCellIntChGFPCor = tomatoCell.getIntegratedDensity(imhGFP) - (bgGFP[0] * tomatoCell.getVolumeUnit());
 
 
                             // Write results
@@ -274,7 +275,7 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                             double objMeanPV = obj.getPixMeanValue(imhPV);
                             double objIntTomato = obj.getIntegratedDensity(imhTomato);
                             PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\n");
+                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\n");
                             PV_Analyze.flush();
                         }
                         

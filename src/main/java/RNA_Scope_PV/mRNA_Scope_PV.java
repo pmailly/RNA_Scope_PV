@@ -58,6 +58,7 @@ public class mRNA_Scope_PV implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
@@ -69,7 +70,7 @@ public class mRNA_Scope_PV implements PlugIn {
             // Find images with nd extension
             ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
-                IJ.showMessage("Error", "No images found with nd extension");
+                IJ.showMessage("Error", "No images found with lif extension");
                 return;
             }
             // create output folder
@@ -176,7 +177,7 @@ public class mRNA_Scope_PV implements PlugIn {
                             double objVol = obj.getVolumeUnit();
                             double objInt = obj.getIntegratedDensity(imhRNA);
                             RNAScope_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                    bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
+                                    bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
                             RNAScope_Analyze.flush();
                        }
                        options.setSeriesOn(s, false);
@@ -248,8 +249,8 @@ public class mRNA_Scope_PV implements PlugIn {
                                 double objIntTomato = obj.getIntegratedDensity(imhTomato);
                                 double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                 PV_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\t"+
-                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\t"+
+                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
                                 PV_Analyze.flush();
                             }
                             // Tomato
@@ -264,8 +265,8 @@ public class mRNA_Scope_PV implements PlugIn {
                                 double objIntTomato = obj.getIntegratedDensity(imhTomato);
                                 double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                 Tomato_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+TomatoPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntTomato+"\t"+
-                                        bgTomato[0]+"\t"+bgTomato[1]+"\t"+(objIntTomato - (bgTomato[0] * obj.getVolumePixels()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+
-                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
+                                        bgTomato[0]+"\t"+bgTomato[1]+"\t"+(objIntTomato - (bgTomato[0] * obj.getVolumeUnit()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+
+                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
                                 Tomato_Analyze.flush();
                             }
                             // Find PNN cells with xml points file
@@ -289,11 +290,11 @@ public class mRNA_Scope_PV implements PlugIn {
                                     pvIndex = PVPop.getIndexOf(pvCell);
                                 }    
                                 if (tomatoCell != null) {
-                                    objIntTomato = tomatoCell.getIntegratedDensity(imhTomato) - bgTomato[0] * (tomatoCell.getVolumePixels());
+                                    objIntTomato = tomatoCell.getIntegratedDensity(imhTomato) - bgTomato[0] * (tomatoCell.getVolumeUnit());
                                     tomatoIndex = TomatoPop.getIndexOf(tomatoCell);
                                 }
                                 PNN_Analyze.write(rootName+"_"+seriesName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                        bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+
+                                        bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumeUnit())+"\t"+pvIndex+"\t"+objIntPV+
                                         "\t"+tomatoIndex+"\t"+objIntTomato+"\n");
                                 PNN_Analyze.flush();
                             }

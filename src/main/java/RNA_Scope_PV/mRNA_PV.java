@@ -68,6 +68,7 @@ public class mRNA_PV implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
@@ -79,7 +80,7 @@ public class mRNA_PV implements PlugIn {
             // Find images with nd extension
             ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
-                IJ.showMessage("Error", "No images found with nd extension");
+                IJ.showMessage("Error", "No images found with lif extension");
                 return;
             }
             // create output folder
@@ -156,9 +157,9 @@ public class mRNA_PV implements PlugIn {
                                 double objInt = obj.getIntegratedDensity(imhRNA);
                                 if (o == 0)
                                     RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
+                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
                                 else 
-                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
+                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
                                 RNA_PV_Analyze.flush();
                             }
                             // save image for objects population

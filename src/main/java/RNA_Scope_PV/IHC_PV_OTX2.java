@@ -106,6 +106,7 @@ public class IHC_PV_OTX2 implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
@@ -251,7 +252,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                                 double objMeanPV = obj.getPixMeanValue(imhPV);
                                 double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\n");
                                 PV_Analyze.flush();
                             }
 
@@ -262,7 +263,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                                 double objIntPV = obj.getIntegratedDensity(imhPV);
                                 double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                                 Otx2_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+Otx2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntOtx2+"\t"+
-                                        bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumePixels()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\n");
+                                        bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumeUnit()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\n");
                                 Otx2_Analyze.flush();
                             }
                             tools.closeImages(imgOtx2);
