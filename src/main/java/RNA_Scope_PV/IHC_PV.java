@@ -204,7 +204,7 @@ public class IHC_PV implements PlugIn {
                                 double objIntPV = obj.getIntegratedDensity(imhPV);
                                 double objMeanPV = obj.getPixMeanValue(imhPV);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\n");
                                 PV_Analyze.flush();
                             }
 

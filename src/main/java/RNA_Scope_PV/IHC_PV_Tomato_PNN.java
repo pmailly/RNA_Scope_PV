@@ -268,8 +268,8 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 double objIntTomato = obj.getIntegratedDensity(imhTomato);
                                 double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\t"+
-                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntTomato - (bgTomato[0] * objVol))+"\t"+
+                                        (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                                 PV_Analyze.flush();
                             }
                             
@@ -283,7 +283,7 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 int pvCellIndex = -1;
                                 double pvCellIntChPVCor = 0;
                                 if (pvCell != null) {
-                                    pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                                    pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                                     pvCellIndex = PVPop.getIndexOf(pvCell);
                                 }
                                 // find associated PNN cell and integrated intensity
@@ -292,15 +292,15 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 double pnnCellIntChPNNCor = 0;
 
                                 if (pnnCell != null) {
-                                    pnnCellIntChPNNCor = pnnCell.getIntegratedDensity(imhPNN) - (bgPNN[0] * pnnCell.getVolumeUnit());
+                                    pnnCellIntChPNNCor = pnnCell.getIntegratedDensity(imhPNN) - (bgPNN[0] * pnnCell.getVolumePixels());
                                     pnnCellIndex = PNNPop.getIndexOf(pnnCell);
                                 }
                                 // Find tomato integrated intensity in PV and PNN channel
                                 Object3D tomatoCellDonut = TomatoDonutPop.getObject(o);
                                 double tomatoCellIntChTomato = tomatoCell.getIntegratedDensity(imhTomato);
-                                double tomatoCellIntChTomatoCor = tomatoCellIntChTomato - (bgTomato[0] * tomatoCell.getVolumeUnit());
-                                double tomatoCellIntChPVCor = tomatoCell.getIntegratedDensity(imhPV) - (bgPV[0] * tomatoCell.getVolumeUnit());
-                                double tomatoCellIntChPNNCor = tomatoCellDonut.getIntegratedDensity(imhPNN) - (bgPNN[0] * tomatoCellDonut.getVolumeUnit());
+                                double tomatoCellIntChTomatoCor = tomatoCellIntChTomato - (bgTomato[0] * tomatoCell.getVolumePixels());
+                                double tomatoCellIntChPVCor = tomatoCell.getIntegratedDensity(imhPV) - (bgPV[0] * tomatoCell.getVolumePixels());
+                                double tomatoCellIntChPNNCor = tomatoCellDonut.getIntegratedDensity(imhPNN) - (bgPNN[0] * tomatoCellDonut.getVolumePixels());
 
 
                                 // Write results
@@ -324,15 +324,15 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                                 int pvIndex = -1;
                                 int TomatoIndex = -1;
                                 if (pvCell != null) {
-                                    objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                                    objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                                     pvIndex = PVPop.getIndexOf(pvCell);
                                 }    
                                 if (TomatoCell != null) {
-                                    objIntTomato = TomatoCell.getIntegratedDensity(imhTomato) - bgTomato[0] * (TomatoCell.getVolumeUnit());
+                                    objIntTomato = TomatoCell.getIntegratedDensity(imhTomato) - bgTomato[0] * (TomatoCell.getVolumePixels());
                                     TomatoIndex = TomatoPop.getIndexOf(TomatoCell);
                                 }
                                 PNN_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                        bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumeUnit())+"\t"+pvIndex+"\t"+objIntPV+
+                                        bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+
                                         "\t"+TomatoIndex+"\t"+objIntTomato+"\n");
                                 PNN_Analyze.flush();
                             }

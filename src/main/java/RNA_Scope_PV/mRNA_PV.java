@@ -157,9 +157,9 @@ public class mRNA_PV implements PlugIn {
                                 double objInt = obj.getIntegratedDensity(imhRNA);
                                 if (o == 0)
                                     RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
+                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                 else 
-                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
+                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                 RNA_PV_Analyze.flush();
                             }
                             // save image for objects population

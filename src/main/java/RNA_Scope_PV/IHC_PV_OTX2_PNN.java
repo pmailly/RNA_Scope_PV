@@ -269,8 +269,8 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                             double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                             PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+
-                                    (objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                    bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\t"+
+                                    (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                             PV_Analyze.flush();
                         }
 
@@ -284,8 +284,8 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                             double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                             Otx2_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+Otx2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntOtx2+"\t"+
-                                    bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumeUnit()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+
-                                    (objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                    bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumePixels()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+
+                                    (objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                             Otx2_Analyze.flush();
                         }
 
@@ -303,15 +303,15 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                             int pvIndex = -1;
                             int Otx2Index = -1;
                             if (pvCell != null) {
-                                objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                                objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                                 pvIndex = PVPop.getIndexOf(pvCell);
                             }    
                             if (Otx2Cell != null) {
-                                objIntOtx2 = Otx2Cell.getIntegratedDensity(imhOtx2) - bgOtx2[0] * (Otx2Cell.getVolumeUnit());
+                                objIntOtx2 = Otx2Cell.getIntegratedDensity(imhOtx2) - bgOtx2[0] * (Otx2Cell.getVolumePixels());
                                 Otx2Index = Otx2Pop.getIndexOf(Otx2Cell);
                             }
                             PNN_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                    bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumeUnit())+"\t"+pvIndex+"\t"+objIntPV+
+                                    bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+
                                     "\t"+Otx2Index+"\t"+objIntOtx2+"\n");
                             PNN_Analyze.flush();
                         }

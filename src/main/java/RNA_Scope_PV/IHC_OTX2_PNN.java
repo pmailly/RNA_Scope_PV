@@ -243,7 +243,7 @@ public class IHC_OTX2_PNN implements PlugIn {
                                     double objMeanOTX2 = obj.getPixMeanValue(imhOTX2);
                                     double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                     OTX2_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+OTX2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanOTX2+"\t"+objIntOTX2+"\t"+
-                                            bgOTX2[0]+"\t"+ bgOTX2[1] + "\t" + (objIntOTX2 - (bgOTX2[0] * obj.getVolumeUnit()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                            bgOTX2[0]+"\t"+ bgOTX2[1] + "\t" + (objIntOTX2 - (bgOTX2[0] * obj.getVolumePixels()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                                     OTX2_Analyze.flush();
                                 }
 
@@ -257,11 +257,11 @@ public class IHC_OTX2_PNN implements PlugIn {
                                     double objIntOTX2 = 0;
                                     int pvIndex = -1;
                                     if (pvCell != null) {
-                                        objIntOTX2 = pvCell.getIntegratedDensity(imhOTX2) - (bgOTX2[0] * pvCell.getVolumeUnit());
+                                        objIntOTX2 = pvCell.getIntegratedDensity(imhOTX2) - (bgOTX2[0] * pvCell.getVolumePixels());
                                         pvIndex = OTX2Pop.getIndexOf(pvCell);
                                     }    
                                     PNN_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumeUnit())+"\t"+pvIndex+"\t"+objIntOTX2+"\n");
+                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntOTX2+"\n");
                                     PNN_Analyze.flush();
                                 }
                                 tools.closeImages(imgPNN);

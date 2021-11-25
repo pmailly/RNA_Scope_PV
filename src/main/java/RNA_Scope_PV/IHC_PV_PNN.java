@@ -248,7 +248,7 @@ public class IHC_PV_PNN implements PlugIn {
                                     double objMeanPV = obj.getPixMeanValue(imhPV);
                                     double objIntPNN = objDonut.getIntegratedDensity(imhPNN);
                                     PV_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                            bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumeUnit()))+"\n");
+                                            bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntPNN - (bgPNN[0] * objDonut.getVolumePixels()))+"\n");
                                     PV_Analyze.flush();
                                 }
 
@@ -262,11 +262,11 @@ public class IHC_PV_PNN implements PlugIn {
                                     double objIntPV = 0;
                                     int pvIndex = -1;
                                     if (pvCell != null) {
-                                        objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                                        objIntPV = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                                         pvIndex = PVPop.getIndexOf(pvCell);
                                     }    
                                     PNN_Analyze.write(rootName+"\t"+seriesName+"\t"+roiName+"\t"+sectionVol+"\t"+PNNPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntPNN+"\t"+
-                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumeUnit())+"\t"+pvIndex+"\t"+objIntPV+"\n");
+                                            bgPNN[0]+"\t"+bgPNN[1]+"\t"+(objIntPNN - bgPNN[0] * obj.getVolumePixels())+"\t"+pvIndex+"\t"+objIntPV+"\n");
                                     PNN_Analyze.flush();
                                 }
                                 tools.closeImages(imgPNN);
