@@ -90,7 +90,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
         try {
             tools.pnn = false;
             if (canceled) {
-                IJ.showMessage(" Pluging canceled");
+                IJ.showMessage("Pluging canceled");
                 return;
             }
             imageDir = IJ.getDirectory("Choose Directory Containing Image Files...");
@@ -142,6 +142,10 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     return;
                 }
             }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
@@ -169,7 +173,11 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 //section volume in mm^3
                 double sectionVol = (imgCfos.getWidth() * cal.pixelWidth * imgCfos.getHeight() * cal.pixelHeight * imgCfos.getNSlices() * cal.pixelDepth)/1e9;
                 // FindCfos cells
-                Objects3DPopulation CfosPop = tools.findCells(imgCfos, null, 18, 20, 1, "MeanPlusStDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                Objects3DPopulation CfosPop = new Objects3DPopulation();
+                if (tools.stardist)
+                    CfosPop = tools.stardistCellsPop(imgCfos);
+                else
+                    CfosPop = tools.findCells(imgCfos, null, 18, 20, 1, "MeanPlusStDev", false, 0, 1);
                 tools.filterCells(CfosPop, 0.55);
                 System.out.println("Cfos Cells found : " +CfosPop.getNbObjects());
 
@@ -180,8 +188,11 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 ImagePlus imgPV = BF.openImagePlus(options)[0];
                 // PV background
                 double[] bgPV = tools.find_background(imgPV);
-                // find PV cells                          
-                Objects3DPopulation PVPop = tools.findCells(imgPV, null, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
+                // find PV cells 
+                Objects3DPopulation PVPop = new Objects3DPopulation();                     
+                if (tools.stardist)
+                    CfosPop = tools.stardistCellsPop(imgPV);
+                PVPop = tools.findCells(imgPV, null, 18, 20, 1, "MeanPlusStdDev", true, 20, 1);
                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                 // NeuN cells

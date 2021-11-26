@@ -4,7 +4,6 @@ import RNA_Scope_PV_Stardist.StarDist2D;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import static ij.IJ.setBackgroundColor;
-import static ij.IJ.setForegroundColor;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
@@ -44,10 +43,6 @@ import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
 import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
 import net.haesleinhuepf.clij2.CLIJ2;
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.Img;
-import net.imglib2.img.display.imagej.ImageJFunctions;
-import net.imglib2.type.numeric.RealType;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.w3c.dom.Document;
@@ -67,7 +62,7 @@ import org.xml.sax.SAXException;
 public class RNAScope_Tools3D {
     
 
-    public double minCellVol= 50;
+    public double minCellVol= 150;
     public double maxCellVol = 15000;
     public Calibration cal = new Calibration();
     public final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
@@ -81,15 +76,14 @@ public class RNAScope_Tools3D {
     private final ridge.Lines_ ridgeDectection = new ridge.Lines_();
     
     // Stardist
+    public boolean stardist = false;
     public Object syncObject = new Object();
     public final double stardistPercentileBottom = 0.2;
     public final double stardistPercentileTop = 99.8;
-    public final double stardistProbThreshNuc = 0.55;
-    public final double stardistOverlayThreshNuc = 0.4;
-    public final double stardistProbThreshDots = 0.7;
-    public final double stardistOverlayThreshDots = 0.45;
+    public final double stardistProbThreshNuc = 0.7;
+    public final double stardistOverlayThreshNuc = 0.35;
     public String stardistOutput = "Label Image"; 
-    protected String starDistModel = "";
+    protected String starDistModel = null;
 
     // CLIJ2
     public CLIJ2 clij2 = CLIJ2.getInstance();
@@ -214,6 +208,28 @@ public class RNAScope_Tools3D {
             }
         }
     }
+    
+    /**
+     * Ask for parameters
+     * @param channels
+     * @return 
+     */
+    
+    public String dialog() {
+        
+        GenericDialogPlus gd = new GenericDialogPlus("IHC parameters");
+        gd.setInsets(0, 10, 0);
+        gd.addImage(icon);
+        gd.addDirectoryField("Image folder : ", "");
+        gd.addMessage("Cells detection",Font.getFont("Monospace"), Color.blue);
+        gd.addCheckbox("Stardist :", stardist);
+        gd.addFileField("Model file :", starDistModel);
+        gd.showDialog();
+        String imageFolder = gd.getNextString();
+        stardist = gd.getNextBoolean();
+        starDistModel = gd.getNextString();
+        return(imageFolder);
+    }
   
     /**
      * Ask for parameters
@@ -237,6 +253,8 @@ public class RNAScope_Tools3D {
             gd.addNumericField("High contrast : ", ridgeHigh);
             gd.addNumericField("Low contrast  : ", ridgeLow);
         }
+        gd.addMessage("Cells detection method",Font.getFont("Monospace"), Color.blue);
+        gd.addCheckbox("Stardist ", stardist);
         gd.addFileField("Tensor flow Model file :", starDistModel);
         gd.addCheckbox("Objective X63", obj63);
         gd.showDialog();
@@ -249,9 +267,10 @@ public class RNAScope_Tools3D {
             ridgeHigh = gd.getNextNumber();
             ridgeLow = gd.getNextNumber();
         }
-        starDistModel =gd.getNextString();
+        stardist = gd.getNextBoolean();
+        starDistModel = gd.getNextString();
         obj63 = gd.getNextBoolean();
-        if(gd.wasCanceled())
+        if (gd.wasCanceled())
             chChoices = null;
         return(chChoices);
     }
@@ -371,7 +390,7 @@ public class RNAScope_Tools3D {
      * @return 
      */
     public Objects3DPopulation findCells(ImagePlus imgCells, Roi roi, int blur1, int blur2, double med, String th, boolean removeOutliers, int rad, 
-            int std, double minCellVol, double maxCellVol) {
+            int std) {
         ImagePlus img = new Duplicator().run(imgCells);
         img.setCalibration(imgCells.getCalibration());
         if (removeOutliers)

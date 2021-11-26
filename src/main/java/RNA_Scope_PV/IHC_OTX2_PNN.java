@@ -137,7 +137,10 @@ public class IHC_OTX2_PNN implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             // write headers
             writeHeaders();
             
@@ -220,7 +223,11 @@ public class IHC_OTX2_PNN implements PlugIn {
                                 // OTX2 background
                                 double[] bgOTX2 = tools.find_background(imgOTX2);
                                 // find OTX2 cells                          
-                                Objects3DPopulation OTX2Pop = tools.findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                                Objects3DPopulation OTX2Pop = new Objects3DPopulation();
+                                if (tools.stardist)
+                                    OTX2Pop = tools.stardistCellsPop(imgOTX2);
+                                else
+                                    OTX2Pop = tools.findCells(imgOTX2, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1);
                                 System.out.println("OTX2 Cells found : " + OTX2Pop.getNbObjects());
 
                                 // save image for objects population

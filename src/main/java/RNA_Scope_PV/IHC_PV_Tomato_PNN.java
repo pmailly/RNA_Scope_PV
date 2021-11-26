@@ -151,7 +151,10 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             // write headers
             writeHeaders();
             
@@ -225,7 +228,11 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                             // PV background
                             double[] bgPV = tools.find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation PVPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             //Tomato
@@ -237,7 +244,11 @@ public class IHC_PV_Tomato_PNN implements PlugIn {
                             // Tomato background
                             double[] bgTomato = tools.find_background(imgTomato);
                             // Find Tomato cells
-                            Objects3DPopulation TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 3, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation TomatoPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                TomatoPop = tools.stardistCellsPop(imgTomato);
+                            else
+                                TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 3);
                             tools.filterCells(TomatoPop, 0.55);
                             System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 

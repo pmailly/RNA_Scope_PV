@@ -138,7 +138,10 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
@@ -190,7 +193,12 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         //section volume in mm^3
                         double sectionVol = (imgTomato.getWidth() * cal.pixelWidth * imgTomato.getHeight() * cal.pixelHeight * imgTomato.getNSlices() * cal.pixelDepth)/1e9;
                         // Find Tomato cells
-                        Objects3DPopulation TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "Otsu", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                        
+                        Objects3DPopulation TomatoPop = new Objects3DPopulation();
+                        if (tools.stardist)
+                            TomatoPop = tools.stardistCellsPop(imgTomato);
+                        else 
+                            TomatoPop = tools.findCells(imgTomato, roi, 18, 20, 1, "Otsu", false, 0, 1);
                         tools.filterCells(TomatoPop, 0.55);
                         System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects()  + " in " + roiName);
 
@@ -202,7 +210,11 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         // PV background
                         double[] bgPV = tools.find_background(imgPV);
                         // find PV cells                          
-                        Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                        Objects3DPopulation PVPop = new Objects3DPopulation();
+                        if (tools.stardist)
+                            PVPop = tools.stardistCellsPop(imgPV);
+                        else
+                            PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", false, 0, 1);
                         System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                         // GFP cells
@@ -212,7 +224,11 @@ public class IHC_GFP_PV_Tomato implements PlugIn {
                         ImagePlus imgGFP = BF.openImagePlus(options)[0];
                         // GFP background
                         double[] bgGFP = tools.find_background(imgGFP);
-                        Objects3DPopulation GFPPop = tools.findCells(imgGFP, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
+                        Objects3DPopulation GFPPop = new Objects3DPopulation();
+                        if (tools.stardist)
+                            GFPPop = tools.stardistCellsPop(imgGFP);
+                        else
+                            GFPPop = tools.findCells(imgGFP, roi, 18, 20, 1, "MeanPlusStdDev", true, 20, 1);
                         System.out.println("GFP Cells found : " + GFPPop.getNbObjects() + " in " + roiName);
 
 

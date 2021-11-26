@@ -153,7 +153,10 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);  
                 ImporterOptions options = new ImporterOptions();
@@ -224,9 +227,13 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                         double[] bgPV = tools.find_background(imgPV);
                         // find PV cells 
                         Objects3DPopulation PVPop = new Objects3DPopulation();
+                        /// ??????????? On compte pas PV si pas X63 ??????????????
                         if (!tools.obj63)
-                            PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
-                       System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 18, 20, 1, "MeanPlusStdDev", true, 10, 1);
+                        System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                         //Otx2
                         System.out.println("Opening Otx2 channel ...");
@@ -238,11 +245,17 @@ public class IHC_PV_OTX2_PNN implements PlugIn {
                         // Find Otx2 cells
                         Objects3DPopulation Otx2Pop = new Objects3DPopulation();
                         if (tools.obj63) {
-                            Otx2Pop = tools.findCells(imgOtx2, roi, 15, 25, 4, "Huang", false, 10, 3, tools.minCellVol, tools.maxCellVol);
+                            if (tools.stardist)
+                                Otx2Pop = tools.stardistCellsPop(imgOtx2);
+                            else
+                                Otx2Pop = tools.findCells(imgOtx2, roi, 15, 25, 4, "Huang", false, 10, 3);
                             tools.filterCells(Otx2Pop, 0.55);
                         }
                         else {
-                            Otx2Pop = tools.findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, 10, 3, tools.minCellVol, tools.maxCellVol);
+                            if (tools.stardist)
+                                Otx2Pop = tools.stardistCellsPop(imgOtx2);
+                            else
+                                Otx2Pop = tools.findCells(imgOtx2, roi, 18, 20, 1, "Huang", true, 10, 3);
                             tools.filterCells(Otx2Pop, 0.55);
                         }
                         System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);

@@ -139,7 +139,10 @@ public class IHC_PV_PNN implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             // write headers
             writeHeaders();
             
@@ -225,7 +228,11 @@ public class IHC_PV_PNN implements PlugIn {
                                 // PV background
                                 double[] bgPV = tools.find_background(imgPV);
                                 // find PV cells                          
-                                Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                                Objects3DPopulation PVPop = new Objects3DPopulation();
+                                if (tools.stardist)
+                                    PVPop = tools.stardistCellsPop(imgPV);
+                                else
+                                    PVPop = tools.findCells(imgPV, roi, 4, 6, 1, "MeanPlusStdDev", false, 0, 1);
                                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                                 // save image for objects population

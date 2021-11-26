@@ -63,8 +63,12 @@ public class mRNA_Scope_PV implements PlugIn {
                 IJ.showMessage(" Pluging canceled");
                 return;
             }
-            imageDir = IJ.getDirectory("Choose Directory Containing lif Files...");
+            imageDir = tools.dialog();
             if (imageDir == null) {
+                return;
+            }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
                 return;
             }
             // Find images with nd extension
@@ -169,7 +173,11 @@ public class mRNA_Scope_PV implements PlugIn {
                        double sectionVol = (imgRNA.getWidth() * cal.pixelWidth * imgRNA.getHeight() * cal.pixelHeight
                                * sizeZ * cal.pixelDepth) / Math.pow(10, 9);
                        double[] bgRNA = tools.find_background(imgRNA);
-                       RNAPop = tools.findCells(imgRNA, null, 8, 10, 1, "Li", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                       RNAPop = new Objects3DPopulation();
+                       if (tools.stardist)
+                           RNAPop = tools.stardistCellsPop(imgRNA);
+                       else
+                           RNAPop = tools.findCells(imgRNA, null, 8, 10, 1, "Li", false, 0, 1);
                        System.out.println("RNA Cells found : " + RNAPop.getNbObjects());
                        ImageHandler imhRNA = ImageHandler.wrap(imgRNA);
                        for (int o = 0; o < RNAPop.getNbObjects(); o++) {
@@ -229,7 +237,7 @@ public class mRNA_Scope_PV implements PlugIn {
                             float dilatedStepZ = (float) (6/cal.pixelDepth);
 
                             // PV
-                            PVPop = tools.findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                            PVPop = tools.findCells(imgPV, null, 8, 10, 1, "MeanPlusStdDev", false, 0, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                             // filter again sphericity and intensity
@@ -254,7 +262,7 @@ public class mRNA_Scope_PV implements PlugIn {
                                 PV_Analyze.flush();
                             }
                             // Tomato
-                            TomatoPop = tools.findCells(imgTomato, null, 8, 10, 1, "Yen", false, 0, 1,tools.minCellVol, tools.maxCellVol);
+                            TomatoPop = tools.findCells(imgTomato, null, 8, 10, 1, "Yen", false, 0, 1);
                             System.out.println("Tomato Cells found : " + TomatoPop.getNbObjects());
                             TomatoDonutPop  = tools.createDonutPop(TomatoPop, imgTomato, dilatedStepXY, dilatedStepZ);
                             for (int o = 0; o < TomatoPop.getNbObjects(); o++) {

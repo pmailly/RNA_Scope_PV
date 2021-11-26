@@ -73,8 +73,12 @@ public class mRNA_PV implements PlugIn {
                 IJ.showMessage(" Pluging canceled");
                 return;
             }
-            imageDir = IJ.getDirectory("Choose Directory Containing lif Files...");
+            imageDir = tools.dialog();
             if (imageDir == null) {
+                return;
+            }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
                 return;
             }
             // Find images with nd extension
@@ -145,7 +149,10 @@ public class mRNA_PV implements PlugIn {
                             double[] bgRNA = tools.find_background(imgRNA);
                             Objects3DPopulation RNAPop = new Objects3DPopulation();
                             if (seriesName.contains("Visuel"))
-                                RNAPop = tools.findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                                if (tools.stardist)
+                                   RNAPop = tools.stardistCellsPop(imgRNA);
+                                else
+                                    RNAPop = tools.findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, 1);
                             else
                                 RNAPop = tools.findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
                             tools.filterCells(RNAPop, 0.45);

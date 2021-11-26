@@ -98,8 +98,12 @@ public class IHC_PV implements PlugIn {
                 IJ.showMessage(" Pluging canceled");
                 return;
             }
-            imageDir = IJ.getDirectory("Choose Directory Containing Image Files...");
+            imageDir = tools.dialog();
             if (imageDir == null) {
+                return;
+            }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
                 return;
             }
             // Find images with nd extension
@@ -187,8 +191,13 @@ public class IHC_PV implements PlugIn {
                             double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                             // PV background
                             double[] bgPV = tools.find_background(imgPV);
+                            
                             // find PV cells                          
-                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation PVPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             // save image for objects population

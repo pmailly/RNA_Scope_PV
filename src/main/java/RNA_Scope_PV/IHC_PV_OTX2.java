@@ -162,7 +162,10 @@ public class IHC_PV_OTX2 implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
              /** 
              * 
              * Detect IHC PV cells, measure intensity in PV channel2 and Otx2 channel1
@@ -221,7 +224,11 @@ public class IHC_PV_OTX2 implements PlugIn {
                             // PV background
                             double[] bgPV = tools.find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation PVPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             //Otx2
@@ -233,7 +240,11 @@ public class IHC_PV_OTX2 implements PlugIn {
                             // Otx2 background
                             double[] bgOtx2 = tools.find_background(imgOtx2);
                             // Find Otx2 cells                            
-                            Objects3DPopulation Otx2Pop = tools.findCellsPiriform(imgOtx2, null, 8, 6, 2, "Otsu");
+                            Objects3DPopulation Otx2Pop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                Otx2Pop = tools.stardistCellsPop(imgOtx2);
+                            else
+                                Otx2Pop = tools.findCellsPiriform(imgOtx2, null, 8, 6, 2, "Otsu");
                             tools.filterCells(Otx2Pop, 0.25);
                             System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
 
