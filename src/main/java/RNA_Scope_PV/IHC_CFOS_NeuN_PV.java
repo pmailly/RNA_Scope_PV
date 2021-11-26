@@ -191,7 +191,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 ImagePlus imgNeuN = BF.openImagePlus(options)[0];
                 // NeuN background
                 double[] bgNeuN = tools.find_background(imgNeuN);
-                Objects3DPopulation NeuNPop = tools.findNeuNCells(imgNeuN);
+                Objects3DPopulation NeuNPop = tools.stardistCellsPop(imgNeuN);
                 System.out.println("NeuN Cells found : " + NeuNPop.getNbObjects());
 
 

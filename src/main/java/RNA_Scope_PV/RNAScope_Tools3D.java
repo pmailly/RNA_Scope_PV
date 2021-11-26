@@ -1,5 +1,6 @@
 package RNA_Scope_PV;
 
+import RNA_Scope_PV_Stardist.StarDist2D;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import static ij.IJ.setBackgroundColor;
@@ -7,9 +8,7 @@ import static ij.IJ.setForegroundColor;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
-import ij.gui.PointRoi;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
@@ -43,6 +42,12 @@ import mcib3d.geom.Point3D;
 import mcib3d.image3d.ImageHandler;
 import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
+import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
+import net.haesleinhuepf.clij2.CLIJ2;
+import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.img.Img;
+import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.type.numeric.RealType;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.w3c.dom.Document;
@@ -67,12 +72,50 @@ public class RNAScope_Tools3D {
     public Calibration cal = new Calibration();
     public final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
     public boolean pnn = false;
-    public double ridgeLine = 15;
-    public double ridgeHigh = 120;
-    public double ridgeLow = 8;
     public boolean obj63 = false;
     
+    // Ridge detection
+    public double ridgeLine = 15;
+    public double ridgeHigh = 120;
+    public double ridgeLow = 8;    
     private final ridge.Lines_ ridgeDectection = new ridge.Lines_();
+    
+    // Stardist
+    public Object syncObject = new Object();
+    public final double stardistPercentileBottom = 0.2;
+    public final double stardistPercentileTop = 99.8;
+    public final double stardistProbThreshNuc = 0.55;
+    public final double stardistOverlayThreshNuc = 0.4;
+    public final double stardistProbThreshDots = 0.7;
+    public final double stardistOverlayThreshDots = 0.45;
+    public String stardistOutput = "Label Image"; 
+    protected String starDistModel = "";
+
+    // CLIJ2
+    public CLIJ2 clij2 = CLIJ2.getInstance();
+    
+    
+    /**
+     * check  installed modules
+     * @return 
+     */
+    public boolean checkInstalledModules() {
+        // check install
+        ClassLoader loader = IJ.getClassLoader();
+        try {
+            loader.loadClass("net.haesleinhuepf.clij2.CLIJ2");
+        } catch (ClassNotFoundException e) {
+            IJ.log("CLIJ not installed, please install from update site");
+            return false;
+        }
+        try {
+            loader.loadClass("mcib3d.geom.Object3D");
+        } catch (ClassNotFoundException e) {
+            IJ.log("3D ImageJ Suite not installed, please install from update site");
+            return false;
+        }
+        return true;
+    }
 
     /**
      *
@@ -100,6 +143,23 @@ public class RNAScope_Tools3D {
         return pop;
     }
     
+    
+     /**  
+     * median 3D box filter
+     * Using CLIJ2
+     * @param imgCL
+     * @param sizeX
+     * @param sizeY
+     * @param sizeZ
+     * @return imgOut
+     */ 
+    public ClearCLBuffer medianFilter(ClearCLBuffer imgCL, double sizeX, double sizeY, double sizeZ) {
+        ClearCLBuffer imgIn = clij2.push(imgCL);
+        ClearCLBuffer imgOut = clij2.create(imgIn);
+        clij2.median3DBox(imgIn, imgOut, sizeX, sizeY, sizeZ);
+        clij2.release(imgCL);
+        return(imgOut);
+    }
     
     /*Median filter 
      * 
@@ -177,6 +237,7 @@ public class RNAScope_Tools3D {
             gd.addNumericField("High contrast : ", ridgeHigh);
             gd.addNumericField("Low contrast  : ", ridgeLow);
         }
+        gd.addFileField("Tensor flow Model file :", starDistModel);
         gd.addCheckbox("Objective X63", obj63);
         gd.showDialog();
         int[] chChoices = new int[channelsName.size()];
@@ -188,6 +249,7 @@ public class RNAScope_Tools3D {
             ridgeHigh = gd.getNextNumber();
             ridgeLow = gd.getNextNumber();
         }
+        starDistModel =gd.getNextString();
         obj63 = gd.getNextBoolean();
         if(gd.wasCanceled())
             chChoices = null;
@@ -382,50 +444,43 @@ public class RNAScope_Tools3D {
         closeImages(img);
         return(cellPop);
     }
+    
+    
+     /**
+     * Find dots population with Stardist
+     */
+    public Objects3DPopulation stardistCellsPop(ImagePlus imgCells) throws IOException{
+        ImagePlus img = new Duplicator().run(imgCells);
+        ClearCLBuffer imgCL = clij2.push(img);
+        ClearCLBuffer imgCLMed = medianFilter(imgCL, 2, 2, 2);
+        clij2.release(imgCL);
+        ImagePlus imgCellsMed = clij2.pull(imgCLMed);
+        clij2.release(imgCLMed);
+        // Go StarDist
+        File starDistModelFile = new File(starDistModel);
+        StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
+        star.loadInput(imgCellsMed); 
+        star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistProbThreshNuc, stardistOverlayThreshNuc, stardistOutput);
+        star.run();
+        // label in 3D
+        ImagePlus nuclei = star.associateLabels();
+        nuclei.setCalibration(cal);
+        ImageInt label3D = ImageInt.wrap(nuclei);
+        label3D.setCalibration(cal);
+        Objects3DPopulation nucPop = new Objects3DPopulation(label3D);
+        Objects3DPopulation nPop = new Objects3DPopulation(nucPop.getObjectsWithinVolume(minCellVol, maxCellVol, true));
+        closeImages(nuclei);
+        closeImages(imgCellsMed);
+        return(nPop);
+    } 
+    
+    
     /**
      * NeuN cells segmentation with stardist
      * @param imgCells
      * @return 
      */
     public Objects3DPopulation findCellsStardist(ImagePlus imgCells) {
-        ImagePlus img = IJ.createImage("mask", "8-bit black", imgCells.getWidth(), imgCells.getHeight(), imgCells.getNSlices());
-        imgCells.setTitle("NeuN_Cells");
-        imgCells.setDimensions(1, 1, imgCells.getNSlices());
-        imgCells.show();
-        IJ.run(imgCells, "Command From Macro", "command=[de.csbdresden.stardist.StarDist2D], args=['input':'NeuN_Cells', 'modelChoice':'Versatile (fluorescent nuclei)', 'normalizeInput':'true', 'percentileBottom':'1.0', 'percentileTop':'99.8', 'probThresh':'0.4', 'nmsThresh':'0.5', 'outputType':'ROI Manager', 'nTiles':'1', 'excludeBoundary':'2', 'roiPosition':'Automatic', 'verbose':'false', 'showCsbdeepProgress':'false', 'showProbAndDist':'false'], process=[false]");
-	imgCells.hide();
-        imgCells.setDimensions(1, imgCells.getNSlices(), 1);
-        RoiManager rm = RoiManager.getRoiManager();
-        for (int r = 0; r < rm.getCount(); r++) {
-            Roi roi = rm.getRoi(r);
-            img.setZ(roi.getZPosition());
-            img.setRoi(roi);
-            IJ.run(img, "Enlarge...", "enlarge=-5 pixel");
-            setForegroundColor(255, 255, 255);
-            IJ.run(img, "Fill", "slice");
-        }
-        rm.close();
-        IJ.run(img, "Select None", "");
-        img.setCalibration(cal);
-        float dil = (float)(5*cal.pixelWidth);
-        Objects3DPopulation cellPop = getPopFromImage(img);
-        for (int i = 0; i < cellPop.getNbObjects(); i++) {
-            Object3D obj = cellPop.getObject(i).getDilatedObject(dil, dil, 0);
-            cellPop.setObject(i, obj);
-        }
-        Objects3DPopulation popCell = new Objects3DPopulation(cellPop.getObjectsWithinVolume(minCellVol, maxCellVol, true));
-        popCell.removeObjectsTouchingBorders(img, false);
-        closeImages(img);
-        return(popCell);
-    }
-    
-    
-    /**
-     * NeuN cells segmentation with stardist
-     * @param imgCells
-     * @return 
-     */
-    public Objects3DPopulation findNeuNCells(ImagePlus imgCells) {
         ImagePlus img = IJ.createImage("mask", "8-bit black", imgCells.getWidth(), imgCells.getHeight(), imgCells.getNSlices());
         imgCells.setTitle("NeuN_Cells");
         imgCells.setDimensions(1, 1, imgCells.getNSlices());
@@ -510,54 +565,6 @@ public class RNAScope_Tools3D {
     }
     
     
-    /**
-     * PNN Cells segmentation
-     * @param imgCells
-     * @param roi
-     * @param pts
-     * @return 
-     */
-    public Objects3DPopulation findPNNCells2(ImagePlus imgCells, Roi roi, ArrayList<Point3D> pts) {        
-        CellOutliner cellsOutline = new CellOutliner();
-        Objects3DPopulation cellPop = new Objects3DPopulation();
-        int cellRadius = (int)Math.round(10 / imgCells.getCalibration().pixelWidth);
-        cellsOutline.cellRadius = cellRadius;
-        cellsOutline.tolerance = 0.8;
-        cellsOutline.darkEdge = true;
-        cellsOutline.dilate = 0;
-        cellsOutline.iterations = 3;
-        cellsOutline.polygonSmoothing = 1;
-        cellsOutline.kernelWidth = 7;
-        cellsOutline.weightingGamma = 3;
-        cellsOutline.kernelSmoothing = 2; 
-        cellsOutline.processAllSlices = true;
-        cellsOutline.buildMaskOutput = true;
-        
-        for (int i = 0; i < pts.size(); i++) {
-            Point3D pt = pts.get(i);
-            int zStart =  (pt.getRoundZ() - 2 < 1) ? 1 : pt.getRoundZ() - 2;
-            int zStop = (pt.getRoundZ() + 2 > imgCells.getNSlices()) ? imgCells.getNSlices() : pt.getRoundZ() + 2;
-            ImagePlus img = new Duplicator().run(imgCells, zStart, zStop);
-            img.setCalibration(imgCells.getCalibration());
-            img.setTitle("Cell");
-            if(roi.contains(pt.getRoundX(), pt.getRoundY())) {
-                img.setSlice(img.getNSlices() / 2);
-                PointRoi ptRoi = new PointRoi(pt.getRoundX(), pt.getRoundY());
-                img.setRoi(ptRoi);
-                cellsOutline.setup("", img);
-                cellsOutline.run(img.getProcessor());
-                ImagePlus cellOutline = cellsOutline.maskImp;
-                cellOutline.deleteRoi();
-                Object3DVoxels cellObj = Object3D_IJUtils.createObject3DVoxels(cellOutline, 1);
-                cellObj.setNewCenter(cellObj.getCenterX(), cellObj.getCenterY(), pt.getRoundZ()-2);
-                cellPop.addObject(cellObj);
-                closeImages(cellOutline);
-            }
-            closeImages(img);
-        }
-        cellPop.setCalibration(imgCells.getCalibration().pixelWidth, imgCells.getCalibration().pixelDepth,"microns");
-        return(cellPop);
-    }
     
     public Object3D findAssociatedCell(Objects3DPopulation pop, Object3D cellObj) {
         Object3D objAsso = null;
