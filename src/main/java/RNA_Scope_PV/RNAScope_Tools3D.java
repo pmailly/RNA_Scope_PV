@@ -474,44 +474,6 @@ public class RNAScope_Tools3D {
         return(nPop);
     } 
     
-    
-    /**
-     * NeuN cells segmentation with stardist
-     * @param imgCells
-     * @return 
-     */
-    public Objects3DPopulation findCellsStardist(ImagePlus imgCells) {
-        ImagePlus img = IJ.createImage("mask", "8-bit black", imgCells.getWidth(), imgCells.getHeight(), imgCells.getNSlices());
-        imgCells.setTitle("NeuN_Cells");
-        imgCells.setDimensions(1, 1, imgCells.getNSlices());
-        imgCells.show();
-        IJ.run(imgCells, "Command From Macro", "command=[de.csbdresden.stardist.StarDist2D], args=['input':'NeuN_Cells', 'modelChoice':'Versatile (fluorescent nuclei)', 'normalizeInput':'true', 'percentileBottom':'1.0', 'percentileTop':'99.8', 'probThresh':'0.4', 'nmsThresh':'0.5', 'outputType':'ROI Manager', 'nTiles':'1', 'excludeBoundary':'2', 'roiPosition':'Automatic', 'verbose':'false', 'showCsbdeepProgress':'false', 'showProbAndDist':'false'], process=[false]");
-	imgCells.hide();
-        imgCells.setDimensions(1, imgCells.getNSlices(), 1);
-        RoiManager rm = RoiManager.getRoiManager();
-        for (int r = 0; r < rm.getCount(); r++) {
-            Roi roi = rm.getRoi(r);
-            img.setZ(roi.getZPosition());
-            img.setRoi(roi);
-            IJ.run(img, "Enlarge...", "enlarge=-5 pixel");
-            setForegroundColor(255, 255, 255);
-            IJ.run(img, "Fill", "slice");
-        }
-        rm.close();
-        IJ.run(img, "Select None", "");
-        img.setCalibration(cal);
-        float dil = (float)(5*cal.pixelWidth);
-        Objects3DPopulation cellPop = getPopFromImage(img);
-        for (int i = 0; i < cellPop.getNbObjects(); i++) {
-            Object3D obj = cellPop.getObject(i).getDilatedObject(dil, dil, 0);
-            cellPop.setObject(i, obj);
-        }
-        Objects3DPopulation popCell = new Objects3DPopulation(cellPop.getObjectsWithinVolume(minCellVol, maxCellVol, true));
-        popCell.removeObjectsTouchingBorders(img, false);
-        closeImages(img);
-        return(popCell);
-    }
-    
    
     
    /**
