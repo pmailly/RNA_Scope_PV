@@ -88,8 +88,9 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
-                IJ.showMessage(" Pluging canceled");
+                IJ.showMessage("Pluging canceled");
                 return;
             }
             imageDir = IJ.getDirectory("Choose Directory Containing Image Files...");
@@ -141,6 +142,10 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     return;
                 }
             }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
             for (String f : imageFile) {
                 rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
@@ -168,7 +173,11 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 //section volume in mm^3
                 double sectionVol = (imgCfos.getWidth() * cal.pixelWidth * imgCfos.getHeight() * cal.pixelHeight * imgCfos.getNSlices() * cal.pixelDepth)/1e9;
                 // FindCfos cells
-                Objects3DPopulation CfosPop = tools.findCells(imgCfos, null, 18, 20, 1, "MeanPlusStDev", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                Objects3DPopulation CfosPop = new Objects3DPopulation();
+                if (tools.stardist)
+                    CfosPop = tools.stardistCellsPop(imgCfos);
+                else
+                    CfosPop = tools.findCells(imgCfos, null, 18, 20, 1, "MeanPlusStDev", false, 0, 1);
                 tools.filterCells(CfosPop, 0.55);
                 System.out.println("Cfos Cells found : " +CfosPop.getNbObjects());
 
@@ -179,8 +188,11 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 ImagePlus imgPV = BF.openImagePlus(options)[0];
                 // PV background
                 double[] bgPV = tools.find_background(imgPV);
-                // find PV cells                          
-                Objects3DPopulation PVPop = tools.findCells(imgPV, null, 18, 20, 1, "MeanPlusStdDev", true, 20, 1, tools.minCellVol, tools.maxCellVol);
+                // find PV cells 
+                Objects3DPopulation PVPop = new Objects3DPopulation();                     
+                if (tools.stardist)
+                    CfosPop = tools.stardistCellsPop(imgPV);
+                PVPop = tools.findCells(imgPV, null, 18, 20, 1, "MeanPlusStdDev", true, 20, 1);
                 System.out.println("PV Cells found : " + PVPop.getNbObjects());
 
                 // NeuN cells
@@ -190,7 +202,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                 ImagePlus imgNeuN = BF.openImagePlus(options)[0];
                 // NeuN background
                 double[] bgNeuN = tools.find_background(imgNeuN);
-                Objects3DPopulation NeuNPop = tools.findNeuNCells(imgNeuN);
+                Objects3DPopulation NeuNPop = tools.stardistCellsPop(imgNeuN);
                 System.out.println("NeuN Cells found : " + NeuNPop.getNbObjects());
 
 
@@ -213,7 +225,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     int pvCellIndex = -1;
                     double pvCellIntChPVCor = 0;
                     if (pvCell != null) {
-                        pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                        pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                         pvCellIndex = PVPop.getIndexOf(pvCell);
                     }
                     // find associated NeuN cell and integrated intensity
@@ -222,14 +234,14 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     double NeuNCellIntChNeuNCor = 0;
 
                     if (NeuNCell != null) {
-                        NeuNCellIntChNeuNCor = NeuNCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * NeuNCell.getVolumeUnit());
+                        NeuNCellIntChNeuNCor = NeuNCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * NeuNCell.getVolumePixels());
                         NeuNCellIndex = NeuNPop.getIndexOf(NeuNCell);
                     }
                     // Find Cfos integrated intensity in PV and NeuN channel
                     double CfosCellIntChCfos = CfosCell.getIntegratedDensity(imhCfos);
                     double CfosCellIntChCfosCor = CfosCellIntChCfos - (bgCfos[0] * CfosCell.getVolumePixels());
-                    double CfosCellIntChPVCor = CfosCell.getIntegratedDensity(imhPV) - (bgPV[0] * CfosCell.getVolumeUnit());
-                    double CfosCellIntChNeuNCor = CfosCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * CfosCell.getVolumeUnit());
+                    double CfosCellIntChPVCor = CfosCell.getIntegratedDensity(imhPV) - (bgPV[0] * CfosCell.getVolumePixels());
+                    double CfosCellIntChNeuNCor = CfosCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * CfosCell.getVolumePixels());
 
  
                     // Write results
@@ -245,14 +257,14 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     double PVCellVol = PVCell.getVolumeUnit();
                     double PVCellIntPV = PVCell.getIntegratedDensity(imhPV);
                     double PVCellIntCfos = PVCell.getIntegratedDensity(imhCfos);
-                    double PVCellIntPVCor = PVCellIntPV - (bgPV[0] * PVCell.getVolumeUnit());
+                    double PVCellIntPVCor = PVCellIntPV - (bgPV[0] * PVCell.getVolumePixels());
                     // find associated Cfos cell and integrated intensity 
                     Object3D CfosCell = tools.findAssociatedCell(CfosPop, PVCell);
                     int CfosCellIndex = -1;
                     double CfosCellIntChCfos = 0;
                     double CfosCellIntChCfosCor = 0;
                     if (CfosCell != null) {
-                        CfosCellIntChCfosCor = CfosCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * CfosCell.getVolumeUnit());
+                        CfosCellIntChCfosCor = CfosCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * CfosCell.getVolumePixels());
                         CfosCellIndex = CfosPop.getIndexOf(PVCell);
                     }
                     // find associated NeuN cell and integrated intensity
@@ -261,7 +273,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     double NeuNCellIntChNeuNCor = 0;
 
                     if (NeuNCell != null) {
-                        NeuNCellIntChNeuNCor = NeuNCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * NeuNCell.getVolumeUnit());
+                        NeuNCellIntChNeuNCor = NeuNCell.getIntegratedDensity(imhNeuN) - (bgNeuN[0] * NeuNCell.getVolumePixels());
                         NeuNCellIndex = NeuNPop.getIndexOf(NeuNCell);
                     }
                     PV_Analyze.write(rootName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+PVCellVol+"\t"+PVCellIntPV+"\t"+
@@ -278,7 +290,7 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     int pvCellIndex = -1;
                     double pvCellIntChPVCor = 0;
                     if (pvCell != null) {
-                        pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumeUnit());
+                        pvCellIntChPVCor = pvCell.getIntegratedDensity(imhPV) - (bgPV[0] * pvCell.getVolumePixels());
                         pvCellIndex = PVPop.getIndexOf(pvCell);
                     }
                     // find associated Cfos cell and integrated intensity
@@ -287,14 +299,14 @@ public class IHC_CFOS_NeuN_PV implements PlugIn {
                     double CfosCellIntChCfosCor = 0;
 
                     if (CfosCell != null) {
-                        CfosCellIntChCfosCor = CfosCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * CfosCell.getVolumeUnit());
+                        CfosCellIntChCfosCor = CfosCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * CfosCell.getVolumePixels());
                         CfosCellIndex = CfosPop.getIndexOf(CfosCell);
                     }
                     // Find NeuN integrated intensity in PV and Cfos channel
                     double NeuNCellIntChNeuN = NeuNCell.getIntegratedDensity(imhNeuN);
-                    double NeuNCellIntChNeuNCor = NeuNCellIntChNeuN - (bgNeuN[0] * NeuNCell.getVolumeUnit());
-                    double NeuNCellIntChPVCor = NeuNCell.getIntegratedDensity(imhPV) - (bgPV[0] * NeuNCell.getVolumeUnit());
-                    double NeuNCellIntChCfosCor = NeuNCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * NeuNCell.getVolumeUnit());
+                    double NeuNCellIntChNeuNCor = NeuNCellIntChNeuN - (bgNeuN[0] * NeuNCell.getVolumePixels());
+                    double NeuNCellIntChPVCor = NeuNCell.getIntegratedDensity(imhPV) - (bgPV[0] * NeuNCell.getVolumePixels());
+                    double NeuNCellIntChCfosCor = NeuNCell.getIntegratedDensity(imhCfos) - (bgCfos[0] * NeuNCell.getVolumePixels());
 
  
                     // Write results

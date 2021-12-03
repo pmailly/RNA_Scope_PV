@@ -106,6 +106,7 @@ public class IHC_PV_OTX2 implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
@@ -161,7 +162,10 @@ public class IHC_PV_OTX2 implements PlugIn {
                     return;
                 }
             }
-            
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
+                return;
+            }
              /** 
              * 
              * Detect IHC PV cells, measure intensity in PV channel2 and Otx2 channel1
@@ -220,7 +224,11 @@ public class IHC_PV_OTX2 implements PlugIn {
                             // PV background
                             double[] bgPV = tools.find_background(imgPV);
                             // find PV cells                          
-                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation PVPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             //Otx2
@@ -232,7 +240,11 @@ public class IHC_PV_OTX2 implements PlugIn {
                             // Otx2 background
                             double[] bgOtx2 = tools.find_background(imgOtx2);
                             // Find Otx2 cells                            
-                            Objects3DPopulation Otx2Pop = tools.findCellsPiriform(imgOtx2, null, 8, 6, 2, "Otsu");
+                            Objects3DPopulation Otx2Pop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                Otx2Pop = tools.stardistCellsPop(imgOtx2);
+                            else
+                                Otx2Pop = tools.findCellsPiriform(imgOtx2, null, 8, 6, 2, "Otsu");
                             tools.filterCells(Otx2Pop, 0.25);
                             System.out.println("Otx2 Cells found : " + Otx2Pop.getNbObjects()  + " in " + roiName);
 
@@ -251,7 +263,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                                 double objMeanPV = obj.getPixMeanValue(imhPV);
                                 double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\t"+(objIntOtx2 - (bgOtx2[0] * objVol))+"\n");
                                 PV_Analyze.flush();
                             }
 
@@ -262,7 +274,7 @@ public class IHC_PV_OTX2 implements PlugIn {
                                 double objIntPV = obj.getIntegratedDensity(imhPV);
                                 double objIntOtx2 = obj.getIntegratedDensity(imhOtx2);
                                 Otx2_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+Otx2Pop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objIntOtx2+"\t"+
-                                        bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumeUnit()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\n");
+                                        bgOtx2[0]+"\t"+bgOtx2[1]+"\t"+(objIntOtx2 - (bgOtx2[0] * obj.getVolumePixels()))+"\t"+(objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\n");
                                 Otx2_Analyze.flush();
                             }
                             tools.closeImages(imgOtx2);

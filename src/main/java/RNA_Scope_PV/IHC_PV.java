@@ -93,12 +93,17 @@ public class IHC_PV implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
             }
-            imageDir = IJ.getDirectory("Choose Directory Containing Image Files...");
+            imageDir = tools.dialog();
             if (imageDir == null) {
+                return;
+            }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
                 return;
             }
             // Find images with nd extension
@@ -186,8 +191,13 @@ public class IHC_PV implements PlugIn {
                             double sectionVol = (imgPV.getWidth() * cal.pixelWidth * imgPV.getHeight() * cal.pixelHeight * imgPV.getNSlices() * cal.pixelDepth)/1e9;
                             // PV background
                             double[] bgPV = tools.find_background(imgPV);
+                            
                             // find PV cells                          
-                            Objects3DPopulation PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1, tools.minCellVol, tools.maxCellVol);
+                            Objects3DPopulation PVPop = new Objects3DPopulation();
+                            if (tools.stardist)
+                                PVPop = tools.stardistCellsPop(imgPV);
+                            else
+                                PVPop = tools.findCells(imgPV, roi, 10, 12, 1, "MeanPlusStdDev", true, 10, 1);
                             System.out.println("PV Cells found : " + PVPop.getNbObjects() + " in " + roiName);
 
                             // save image for objects population
@@ -203,7 +213,7 @@ public class IHC_PV implements PlugIn {
                                 double objIntPV = obj.getIntegratedDensity(imhPV);
                                 double objMeanPV = obj.getPixMeanValue(imhPV);
                                 PV_Analyze.write(rootName+"\t"+roiName+"\t"+sectionVol+"\t"+PVPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objMeanPV+"\t"+objIntPV+"\t"+
-                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumeUnit()))+"\n");
+                                        bgPV[0]+"\t"+ bgPV[1] + "\t" + (objIntPV - (bgPV[0] * obj.getVolumePixels()))+"\n");
                                 PV_Analyze.flush();
                             }
 

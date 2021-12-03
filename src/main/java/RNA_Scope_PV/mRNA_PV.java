@@ -68,18 +68,23 @@ public class mRNA_PV implements PlugIn {
     @Override
     public void run(String arg) {
         try {
+            tools.pnn = false;
             if (canceled) {
                 IJ.showMessage(" Pluging canceled");
                 return;
             }
-            imageDir = IJ.getDirectory("Choose Directory Containing lif Files...");
+            imageDir = tools.dialog();
             if (imageDir == null) {
+                return;
+            }
+            if (tools.stardist && !new File(tools.starDistModel).exists()) {
+                IJ.showMessage("No stardist model found, plugin canceled");
                 return;
             }
             // Find images with nd extension
             ArrayList<String> imageFile = tools.findImages(imageDir, "lif");
             if (imageFile == null) {
-                IJ.showMessage("Error", "No images found with nd extension");
+                IJ.showMessage("Error", "No images found with lif extension");
                 return;
             }
             // create output folder
@@ -144,7 +149,10 @@ public class mRNA_PV implements PlugIn {
                             double[] bgRNA = tools.find_background(imgRNA);
                             Objects3DPopulation RNAPop = new Objects3DPopulation();
                             if (seriesName.contains("Visuel"))
-                                RNAPop = tools.findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, 1, tools.minCellVol, tools.maxCellVol);
+                                if (tools.stardist)
+                                   RNAPop = tools.stardistCellsPop(imgRNA);
+                                else
+                                    RNAPop = tools.findCells(imgRNA, roi, 9, 10, 2, "Triangle", false, 0, 1);
                             else
                                 RNAPop = tools.findCellsPiriform(imgRNA, roi, 10, 12, 1.5, "RenyiEntropy");
                             tools.filterCells(RNAPop, 0.45);
@@ -156,9 +164,9 @@ public class mRNA_PV implements PlugIn {
                                 double objInt = obj.getIntegratedDensity(imhRNA);
                                 if (o == 0)
                                     RNA_PV_Analyze.write(rootName+"_"+seriesName+"\t"+layerName+"\t"+sectionVol+"\t"+RNAPop.getNbObjects()/sectionVol+"\t"+o+"\t"+objVol+"\t"+objInt+"\t"+
-                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
+                                        bgRNA[0] + "\t" + bgRNA[1] + "\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                 else 
-                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumeUnit())) + "\n");
+                                    RNA_PV_Analyze.write("\t\t\t\t"+o+"\t"+objVol+"\t"+objInt+"\t\t\t" + (objInt - (bgRNA[0] * obj.getVolumePixels())) + "\n");
                                 RNA_PV_Analyze.flush();
                             }
                             // save image for objects population
